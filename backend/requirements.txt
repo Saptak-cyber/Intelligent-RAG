@@ -13,3 +13,4 @@ transformers
 pydantic
 python-multipart
 huggingface-hub
+tiktoken

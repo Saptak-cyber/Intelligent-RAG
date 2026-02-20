@@ -11,3 +11,5 @@ TASK_19_FINAL_VALIDATION.md
 venv
 /backend/venv/
 __pycache__
+frontend/DEBUG_PANEL_TEST.md
+frontend/API_CLIENT_VERIFICATION.md
