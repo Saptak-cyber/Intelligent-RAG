@@ -46,7 +46,7 @@ class ConversationManager:
                     return Conversation(
                         conversation_id=conv_data["conversation_id"],
                         turns=turns,
-                        created_at=datetime.fromisoformat(conv_data["created_at"].replace("Z", "+00:00"))
+                        created_at=self._parse_timestamp(conv_data["created_at"])
                     )
                 else:
                     logger.warning(f"Conversation {conversation_id} not found, creating new one")
@@ -155,7 +155,7 @@ class ConversationManager:
                 Turn(
                     query=t["query"],
                     response=t["response"],
-                    timestamp=datetime.fromisoformat(t["timestamp"].replace("Z", "+00:00"))
+                    timestamp=self._parse_timestamp(t["timestamp"])
                 )
                 for t in turn_data
             ]
@@ -173,3 +173,39 @@ class ConversationManager:
             Unique conversation ID string
         """
         return f"conv_{uuid.uuid4().hex[:12]}"
+    
+    def _parse_timestamp(self, timestamp_str: str) -> datetime:
+        """
+        Parse timestamp string from Supabase, handling various formats.
+        
+        Supabase can return timestamps with varying microsecond precision,
+        which Python's fromisoformat() can't always handle. This method
+        normalizes the timestamp format.
+        
+        Args:
+            timestamp_str: Timestamp string from Supabase
+            
+        Returns:
+            datetime object
+        """
+        # Replace 'Z' with '+00:00' for timezone
+        timestamp_str = timestamp_str.replace("Z", "+00:00")
+        
+        # Handle microseconds with more than 6 digits
+        # Format: 2026-02-21T02:08:26.18976+00:00
+        if "." in timestamp_str and "+" in timestamp_str:
+            parts = timestamp_str.split(".")
+            if len(parts) == 2:
+                microseconds_and_tz = parts[1]
+                # Split microseconds from timezone
+                if "+" in microseconds_and_tz:
+                    microseconds, tz = microseconds_and_tz.split("+")
+                    # Truncate or pad microseconds to 6 digits
+                    microseconds = microseconds[:6].ljust(6, '0')
+                    timestamp_str = f"{parts[0]}.{microseconds}+{tz}"
+                elif "-" in microseconds_and_tz:
+                    microseconds, tz = microseconds_and_tz.split("-")
+                    microseconds = microseconds[:6].ljust(6, '0')
+                    timestamp_str = f"{parts[0]}.{microseconds}-{tz}"
+        
+        return datetime.fromisoformat(timestamp_str)

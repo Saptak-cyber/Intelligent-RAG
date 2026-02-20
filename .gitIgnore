@@ -13,3 +13,5 @@ venv
 __pycache__
 frontend/DEBUG_PANEL_TEST.md
 frontend/API_CLIENT_VERIFICATION.md
+backend/INGESTION_README.md
+TASK_15_CHECKPOINT_VERIFICATION.md

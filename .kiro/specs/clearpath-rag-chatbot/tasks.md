@@ -353,15 +353,15 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - Test error responses
     - _Requirements: 9.1, 9.5_
 
-- [~] 14. Web interface with chat UI and debug panel
-  - [~] 14.1 Create Next.js chat interface
+- [x] 14. Web interface with chat UI and debug panel
+  - [x] 14.1 Create Next.js chat interface
     - Set up Next.js project with TypeScript
     - Create chat page with message input and submit button
     - Implement message display area with conversation history
     - Style with Tailwind CSS or similar for clean, minimal design
     - _Requirements: 11.1, 11.2, 11.4_
   
-  - [~] 14.2 Implement debug panel in Next.js UI
+  - [x] 14.2 Implement debug panel in Next.js UI
     - Create debug panel component
     - Display model_used for each response
     - Display token usage (input/output)
@@ -369,14 +369,14 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - Update debug panel with each new response
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
   
-  - [~] 14.3 Implement API client in Next.js
+  - [x] 14.3 Implement API client in Next.js
     - Create API route or client-side fetch() call to POST /query
     - Handle response and update UI state
     - Handle errors and display error messages
     - Maintain conversation_id across requests using React state
     - _Requirements: 11.2, 11.3_
   
-  - [~] 14.4 Configure CORS in FastAPI for Next.js frontend
+  - [x] 14.4 Configure CORS in FastAPI for Next.js frontend
     - Add CORS middleware to FastAPI app
     - Allow requests from Next.js development server
     - _Requirements: 11.1, 11.4_
@@ -386,7 +386,7 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - Test that debug panel displays metadata
     - _Requirements: 11.1, 12.1_
 
-- [~] 15. Checkpoint - Ensure complete system works end-to-end
+- [x] 15. Checkpoint - Ensure complete system works end-to-end
   - Ensure all tests pass, ask the user if questions arise.
 
 - [~] 16. Streaming response support (bonus feature)
@@ -492,7 +492,7 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - Create requirements.txt with all Python dependencies
     - Create package.json for Next.js frontend
     - Create Dockerfile for backend (optional)
-    - Create deployment instructions for Vercel (frontend) and Railway/Render (backend)
+    - Create deployment instructions for Vercel (frontend) and Render (backend)
     - Document Supabase setup requirements
     - _Requirements: 18.5_
   
