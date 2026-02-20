@@ -162,8 +162,8 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - Test decision tree logic at each rule level
     - _Requirements: 4.1, 4.3, 4.4_
 
-- [~] 8. Groq API client integration
-  - [~] 8.1 Implement LLMClient class
+- [x] 8. Groq API client integration
+  - [x] 8.1 Implement LLMClient class
     - Create LLMResponse dataclass
     - Initialize Groq client with API key from environment
     - Implement generate() method with model selection
@@ -172,7 +172,7 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - Measure latency for each API call
     - _Requirements: 13.1, 13.2, 13.3_
   
-  - [~] 8.2 Implement error handling for Groq API
+  - [x] 8.2 Implement error handling for Groq API
     - Handle rate limit errors (429) with retry suggestion
     - Handle authentication errors (401)
     - Handle network timeouts
@@ -191,8 +191,8 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - Test latency measurement
     - _Requirements: 13.2, 13.3_
 
-- [~] 9. Output evaluator with quality checks
-  - [~] 9.1 Implement OutputEvaluator class with four quality checks
+- [x] 9. Output evaluator with quality checks
+  - [x] 9.1 Implement OutputEvaluator class with four quality checks
     - Implement evaluate() method returning list of flags
     - Implement no-context detection (chunks_retrieved == 0, not refusal)
     - Implement refusal detection (check for refusal phrases)
@@ -210,7 +210,7 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - Test that no_context flag raised when chunks=0 and not refusal
     - **Validates: Requirements 6.1, 6.2, 6.3**
   
-  - [~] 9.3 Write property test for groundedness detection
+  - [x] 9.3 Write property test for groundedness detection
     - **Property 11: Groundedness Flag Detection**
     - Test that unverified_feature flag raised for proper nouns not in chunks
     - **Validates: Requirements 7.1, 7.3**
@@ -238,7 +238,7 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - _Requirements: 6.1, 7.1, 8.1_
 
 - [~] 10. Routing decision logging system
-  - [~] 10.1 Implement RoutingLogger class with complexity scoring
+  - [-] 10.1 Implement RoutingLogger class with complexity scoring
     - Create log_routing_decision() method
     - Format logs as JSON Lines
     - Write to logs/routing_decisions.jsonl
