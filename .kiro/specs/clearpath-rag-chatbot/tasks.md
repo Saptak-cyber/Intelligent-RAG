@@ -300,8 +300,8 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - Test context formatting
     - _Requirements: 15.1, 15.4_
 
-- [~] 13. API endpoint and request handling
-  - [-] 13.1 Implement API models with Pydantic
+- [x] 13. API endpoint and request handling
+  - [x] 13.1 Implement API models with Pydantic
     - Create QueryRequest model (question, optional conversation_id)
     - Create QueryResponse model (answer, metadata, sources, conversation_id)
     - Create ResponseMetadata model with token breakdown
@@ -312,7 +312,7 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - Create Source model (document, page, relevance_score)
     - _Requirements: 9.1, 9.2, 9.3, 9.5, 10.1_
   
-  - [-] 13.2 Implement POST /query endpoint with accurate token tracking
+  - [x] 13.2 Implement POST /query endpoint with accurate token tracking
     - Validate request body (required question field)
     - Get or create conversation
     - Classify query using ModelRouter (check for skip_retrieval flag)

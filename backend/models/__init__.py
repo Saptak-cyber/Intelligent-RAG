@@ -2,6 +2,7 @@
 from .document import Document, Page
 from .chunk import Chunk, ScoredChunk
 from .conversation import Conversation, Turn
+from .api import QueryRequest, QueryResponse, ResponseMetadata, TokenUsage, Source
 
 __all__ = [
     "Document",
@@ -10,4 +11,9 @@ __all__ = [
     "ScoredChunk",
     "Conversation",
     "Turn",
+    "QueryRequest",
+    "QueryResponse",
+    "ResponseMetadata",
+    "TokenUsage",
+    "Source",
 ]
