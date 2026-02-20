@@ -97,8 +97,8 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - Test Supabase connection and pgvector queries
     - _Requirements: 1.5_
 
-- [~] 5. Retrieval engine
-  - [-] 5.1 Implement RetrievalEngine class with dynamic K-cutoff
+- [x] 5. Retrieval engine
+  - [x] 5.1 Implement RetrievalEngine class with dynamic K-cutoff
     - Initialize with VectorStore and EmbeddingModel
     - Implement retrieve() method with query embedding
     - Apply relevance threshold (score > 0.3) to filter low-quality matches
@@ -125,7 +125,7 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - Test retrieval with various top_k values
     - _Requirements: 2.1, 2.5_
 
-- [~] 6. Checkpoint - Ensure RAG pipeline works end-to-end
+- [-] 6. Checkpoint - Ensure RAG pipeline works end-to-end
   - Ensure all tests pass, ask the user if questions arise.
 
 - [~] 7. Model router with deterministic classification and OOD filter
