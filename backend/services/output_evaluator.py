@@ -1,7 +1,7 @@
 """Output evaluator for response quality checks."""
 import re
 from typing import List, Set
-from backend.models.chunk import ScoredChunk
+from models.chunk import ScoredChunk
 
 
 class OutputEvaluator:

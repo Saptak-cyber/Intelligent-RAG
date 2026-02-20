@@ -237,8 +237,8 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - Test flag combinations
     - _Requirements: 6.1, 7.1, 8.1_
 
-- [~] 10. Routing decision logging system
-  - [-] 10.1 Implement RoutingLogger class with complexity scoring
+- [x] 10. Routing decision logging system
+  - [x] 10.1 Implement RoutingLogger class with complexity scoring
     - Create log_routing_decision() method
     - Format logs as JSON Lines
     - Write to logs/routing_decisions.jsonl
@@ -266,11 +266,11 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - Test log rotation
     - _Requirements: 5.1_
 
-- [~] 11. Checkpoint - Ensure core processing pipeline works
+- [x] 11. Checkpoint - Ensure core processing pipeline works
   - Ensure all tests pass, ask the user if questions arise.
 
-- [~] 12. Conversation manager for multi-turn support
-  - [~] 12.1 Implement ConversationManager class
+- [x] 12. Conversation manager for multi-turn support
+  - [x] 12.1 Implement ConversationManager class
     - Create Conversation and Turn dataclasses
     - Implement get_or_create_conversation() with ID generation
     - Implement add_turn() to store query-response pairs
@@ -301,7 +301,7 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - _Requirements: 15.1, 15.4_
 
 - [~] 13. API endpoint and request handling
-  - [~] 13.1 Implement API models with Pydantic
+  - [-] 13.1 Implement API models with Pydantic
     - Create QueryRequest model (question, optional conversation_id)
     - Create QueryResponse model (answer, metadata, sources, conversation_id)
     - Create ResponseMetadata model with token breakdown
@@ -312,7 +312,7 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - Create Source model (document, page, relevance_score)
     - _Requirements: 9.1, 9.2, 9.3, 9.5, 10.1_
   
-  - [~] 13.2 Implement POST /query endpoint with accurate token tracking
+  - [-] 13.2 Implement POST /query endpoint with accurate token tracking
     - Validate request body (required question field)
     - Get or create conversation
     - Classify query using ModelRouter (check for skip_retrieval flag)

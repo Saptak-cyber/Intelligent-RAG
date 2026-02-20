@@ -8,6 +8,7 @@ This directory contains SQL migration files for setting up the Supabase database
 2. Navigate to the SQL Editor
 3. Run the migration files in order:
    - `001_create_chunks_table.sql` - Creates the document_chunks table and match_chunks function
+   - `002_create_conversations_tables.sql` - Creates the conversations and turns tables
 
 ## What Gets Created
 
@@ -22,11 +23,24 @@ This directory contains SQL migration files for setting up the Supabase database
   - `context_header`: Hierarchical header context
   - `embedding`: 768-dimensional vector embedding (all-mpnet-base-v2)
 
+- **conversations**: Stores conversation metadata
+  - `conversation_id`: Unique identifier for each conversation
+  - `created_at`: Timestamp when conversation was created
+
+- **turns**: Stores individual turns in conversations
+  - `conversation_id`: Foreign key to conversations table
+  - `query`: User query text
+  - `response`: System response text
+  - `timestamp`: Timestamp when turn was created
+
 ### Indexes
 
 - `idx_chunk_id`: Fast lookups by chunk_id
 - `idx_document_name`: Fast filtering by document
 - `idx_embedding_hnsw`: HNSW index for fast vector similarity search
+- `idx_conversation_id`: Fast lookups by conversation_id
+- `idx_turns_conversation_id`: Fast turn retrieval by conversation
+- `idx_turns_timestamp`: Fast ordering of turns by timestamp
 
 ### Functions
 
@@ -39,14 +53,14 @@ This directory contains SQL migration files for setting up the Supabase database
 
 ## Verification
 
-After running the migration, verify the setup:
+After running the migrations, verify the setup:
 
 ```sql
 -- Check if pgvector extension is enabled
 SELECT * FROM pg_extension WHERE extname = 'vector';
 
--- Check if table exists
-SELECT * FROM information_schema.tables WHERE table_name = 'document_chunks';
+-- Check if tables exist
+SELECT * FROM information_schema.tables WHERE table_name IN ('document_chunks', 'conversations', 'turns');
 
 -- Check if function exists
 SELECT * FROM pg_proc WHERE proname = 'match_chunks';
