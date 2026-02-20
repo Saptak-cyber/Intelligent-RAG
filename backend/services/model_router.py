@@ -50,7 +50,7 @@ class ModelRouter:
     
     # Keywords for complexity detection
     COMPLEX_KEYWORDS = {
-        "why", "how", "explain", "compare", "analyze", "difference", "relationship"
+        "explain", "compare", "analyze", "difference", "relationship"
     }
     
     COMPARISON_WORDS = {
@@ -170,44 +170,63 @@ class ModelRouter:
         )
     
     def _is_greeting(self, query_lower: str) -> bool:
-        """Check if query is a greeting."""
-        # Remove punctuation for greeting detection
-        query_clean = re.sub(r'[^\w\s]', '', query_lower).strip()
+        """
+        Check if the query is EXCLUSIVELY a greeting or expression of thanks.
+        Prevents triggering OOD on legitimate queries like "Hi, how do I reset my password?"
+        """
+        # Sort by length descending so "thank you" matches before "thanks"
+        sorted_patterns = sorted(self.GREETING_PATTERNS, key=len, reverse=True)
+        patterns_regex = '|'.join(re.escape(p) for p in sorted_patterns)
         
-        # Check for exact matches or greetings at the start of the query
-        for greeting in self.GREETING_PATTERNS:
-            if query_clean == greeting or query_clean.startswith(greeting + " "):
-                return True
-        return False
+        # Matches only if the entire string (ignoring trailing punctuation/spaces) is a greeting
+        regex = rf'^\s*({patterns_regex})\s*[.!?,\s]*$'
+        return bool(re.match(regex, query_lower))
     
     def _is_meta_comment(self, query_lower: str) -> bool:
-        """Check if query is a meta-comment about the system."""
-        for pattern in self.META_COMMENT_PATTERNS:
-            if pattern in query_lower:
-                return True
-        return False
+        """
+        Check if query is a meta-comment using word boundaries to prevent substring matching.
+        """
+        sorted_patterns = sorted(self.META_COMMENT_PATTERNS, key=len, reverse=True)
+        patterns_regex = '|'.join(re.escape(p) for p in sorted_patterns)
+        
+        # Ensure we only match standalone phrases (e.g., "help" won't match "helping")
+        regex = rf'\b({patterns_regex})\b'
+        
+        # Special guardrail for "help": only trigger if "help" is the core intent,
+        # not if it's part of a longer functional request like "I need help with my server".
+        if "help" in query_lower:
+            words = query_lower.split()
+            if len(words) > 3:  # If it's a longer sentence, it's likely a real question
+                return False
+        
+        return bool(re.search(regex, query_lower))
     
     def _contains_complex_keywords(self, query_lower: str) -> bool:
-        """Check if query contains any complex keywords."""
-        # Use word boundaries to avoid partial matches
-        words = set(re.findall(r'\b\w+\b', query_lower))
-        return bool(words & self.COMPLEX_KEYWORDS)
+        """Check if query contains complex keywords using regex boundaries."""
+        sorted_patterns = sorted(self.COMPLEX_KEYWORDS, key=len, reverse=True)
+        patterns_regex = '|'.join(re.escape(p) for p in sorted_patterns)
+        regex = rf'\b({patterns_regex})\b'
+        return bool(re.search(regex, query_lower))
     
     def _contains_comparison_words(self, query_lower: str) -> bool:
-        """Check if query contains any comparison words."""
-        for word in self.COMPARISON_WORDS:
-            if word in query_lower:
-                return True
-        return False
+        """
+        Check for comparison words using strict boundaries.
+        Fixes the bug where "csv" triggered a match for "vs".
+        """
+        sorted_patterns = sorted(self.COMPARISON_WORDS, key=len, reverse=True)
+        patterns_regex = '|'.join(re.escape(p) for p in sorted_patterns)
+        regex = rf'\b({patterns_regex})\b'
+        return bool(re.search(regex, query_lower))
     
     def _get_matched_keywords(self, query_lower: str, keyword_set: set) -> str:
-        """Get comma-separated list of matched keywords."""
-        words = set(re.findall(r'\b\w+\b', query_lower))
-        matched = words & keyword_set
+        """
+        Get a comma-separated list of matched keywords using the exact same regex logic
+        as the boolean checks, ensuring logging never says "none" incorrectly.
+        """
+        sorted_keywords = sorted(keyword_set, key=len, reverse=True)
+        patterns_regex = '|'.join(re.escape(k) for k in sorted_keywords)
+        regex = rf'\b({patterns_regex})\b'
         
-        # Also check for multi-word patterns in COMPARISON_WORDS
-        for word in keyword_set:
-            if ' ' in word and word in query_lower:
-                matched.add(word)
-        
-        return ', '.join(sorted(matched)) if matched else 'none'
+        # Find all matches
+        matches = set(re.findall(regex, query_lower))
+        return ', '.join(sorted(matches)) if matches else 'none'

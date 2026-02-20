@@ -32,13 +32,13 @@ class ChunkingEngine:
         # Separators for recursive splitting (in priority order)
         self.separators = ["\n\n", "\n", ". ", " ", ""]
     
-    def chunk_documents(self, documents: List[Document], docs_directory: str = "clearpath_docs") -> List[Chunk]:
+    def chunk_documents(self, documents: List[Document], docs_directory: Optional[str] = None) -> List[Chunk]:
         """
         Chunk documents using token-aware recursive splitting with contextual heading injection.
         
         Args:
             documents: List of loaded documents
-            docs_directory: Path to PDF files for header extraction
+            docs_directory: Path to PDF files for header extraction (optional, uses document.source_path if not provided)
             
         Returns:
             List of Chunk objects with text, metadata, and context headers
@@ -48,10 +48,19 @@ class ChunkingEngine:
         for document in documents:
             logger.info(f"Chunking document: {document.filename}")
             
+            # Determine PDF path for header extraction
+            if docs_directory:
+                pdf_path = f"{docs_directory}/{document.filename}"
+            else:
+                # Use source_path from document if available
+                pdf_path = getattr(document, 'source_path', None)
+                if not pdf_path:
+                    # Fallback to relative path
+                    from pathlib import Path
+                    pdf_path = str(Path(__file__).parent.parent / "clearpath_docs" / document.filename)
+            
             # Extract hierarchical headers from PDF
-            header_stack_by_page = self._extract_headers(
-                f"{docs_directory}/{document.filename}"
-            )
+            header_stack_by_page = self._extract_headers(pdf_path)
             
             # Maintain header stack state across pages
             current_header_stack = []

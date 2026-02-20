@@ -32,7 +32,7 @@ class RetrievalEngine:
         2. Perform similarity search in vector store
         3. Apply relevance threshold (score > 0.3) to filter low-quality matches
         4. Apply dynamic K-cutoff: only include chunks within 20% of top score
-           - Example: If top chunk scores 0.85, only include chunks >= 0.68 (0.85 * 0.8)
+           - Example: If top chunk scores 0.85, only include chunks >=  (0.85 * 0.5)
            - Rationale: Prevents "Lost in the Middle" problem where low-relevance
              chunks hurt LLM performance
         5. Return filtered chunks sorted by relevance
@@ -67,7 +67,7 @@ class RetrievalEngine:
                 return []
             
             # Step 3: Apply relevance threshold (score > 0.3)
-            relevance_threshold = 0.3
+            relevance_threshold = 0.2
             filtered_chunks = [
                 chunk for chunk in scored_chunks
                 if chunk.relevance_score > relevance_threshold
