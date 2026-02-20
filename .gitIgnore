@@ -1,2 +1,5 @@
 clearpath_docs
 .env
+.kiro
+CHECKPOINT_6_VERIFICATION.md
+.kiro/specs/clearpath-rag-chatbot/tasks.md

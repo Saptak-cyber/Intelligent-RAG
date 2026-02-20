@@ -125,11 +125,11 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - Test retrieval with various top_k values
     - _Requirements: 2.1, 2.5_
 
-- [-] 6. Checkpoint - Ensure RAG pipeline works end-to-end
+- [x] 6. Checkpoint - Ensure RAG pipeline works end-to-end
   - Ensure all tests pass, ask the user if questions arise.
 
-- [~] 7. Model router with deterministic classification and OOD filter
-  - [~] 7.1 Implement ModelRouter class with decision tree logic
+- [x] 7. Model router with deterministic classification and OOD filter
+  - [x] 7.1 Implement ModelRouter class with decision tree logic
     - Create Classification dataclass
     - Implement classify_query() using tiered rule list (NOT weighted scoring)
     - Rule 0 (OOD Filter): If query is greeting ("hi", "hello", "hey", "thanks") or meta-comment ("who are you", "what can you do") → Simple + skip_retrieval flag
