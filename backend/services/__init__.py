@@ -4,5 +4,6 @@ from .chunking_engine import ChunkingEngine
 from .embedding_model import EmbeddingModel
 from .vector_store import VectorStore
 from .model_router import ModelRouter, Classification
+from .llm_client import LLMClient, LLMResponse, LLMError, LLMClientError
 
-__all__ = ['DocumentLoader', 'ChunkingEngine', 'EmbeddingModel', 'VectorStore', 'ModelRouter', 'Classification']
+__all__ = ['DocumentLoader', 'ChunkingEngine', 'EmbeddingModel', 'VectorStore', 'ModelRouter', 'Classification', 'LLMClient', 'LLMResponse', 'LLMError', 'LLMClientError']
