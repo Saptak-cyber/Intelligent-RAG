@@ -63,8 +63,8 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - Test chunk boundary handling
     - _Requirements: 1.3_
 
-- [~] 4. Vector store and embedding system
-  - [-] 4.1 Implement embedding model integration with Hugging Face Inference API
+- [x] 4. Vector store and embedding system
+  - [x] 4.1 Implement embedding model integration with Hugging Face Inference API
     - Create EmbeddingModel wrapper class
     - Initialize Hugging Face API client with API key
     - Implement embed_text() and embed_batch() methods using all-mpnet-base-v2 model
@@ -76,7 +76,7 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - Add error handling for API failures and rate limits
     - _Requirements: 1.5_
   
-  - [~] 4.2 Implement VectorStore class using Supabase pgvector
+  - [x] 4.2 Implement VectorStore class using Supabase pgvector
     - Create ScoredChunk dataclass
     - Set up Supabase client connection
     - Create database table for chunks with vector column
@@ -98,7 +98,7 @@ This implementation plan breaks down the ClearPath RAG Chatbot into incremental 
     - _Requirements: 1.5_
 
 - [~] 5. Retrieval engine
-  - [~] 5.1 Implement RetrievalEngine class with dynamic K-cutoff
+  - [-] 5.1 Implement RetrievalEngine class with dynamic K-cutoff
     - Initialize with VectorStore and EmbeddingModel
     - Implement retrieve() method with query embedding
     - Apply relevance threshold (score > 0.3) to filter low-quality matches

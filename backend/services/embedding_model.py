@@ -1,8 +1,8 @@
 """Embedding model integration with Hugging Face Inference API."""
 import time
 import logging
-from typing import List, Union
-import httpx
+from typing import List
+from huggingface_hub import InferenceClient
 from config import HUGGINGFACE_API_KEY, EMBEDDING_MODEL
 
 logger = logging.getLogger(__name__)
@@ -37,8 +37,13 @@ class EmbeddingModel:
         self.max_retries = max_retries
         self.initial_delay = initial_delay
         self.timeout = timeout
-        # Use the new router endpoint as per HF API migration
-        self.api_url = f"https://api-inference.huggingface.co/models/{model_name}"
+        
+        # Initialize HuggingFace InferenceClient
+        self.client = InferenceClient(
+            provider="hf-inference",
+            api_key=api_key,
+            timeout=timeout
+        )
         
         logger.info(f"Initialized EmbeddingModel with model: {model_name}")
     
@@ -59,7 +64,9 @@ class EmbeddingModel:
         if not text or not text.strip():
             raise ValueError("Text cannot be empty")
         
-        return self._embed_with_retry([text])[0]
+        result = self._embed_with_retry([text])
+        # feature_extraction returns a list of embeddings, get the first one
+        return result[0] if isinstance(result[0], list) else result
     
     def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """
@@ -104,18 +111,6 @@ class EmbeddingModel:
         Raises:
             RuntimeError: If API request fails after all retries
         """
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "inputs": texts,
-            "options": {
-                "wait_for_model": True  # Wait for model to load if sleeping
-            }
-        }
-        
         delay = self.initial_delay
         last_error = None
         
@@ -123,51 +118,15 @@ class EmbeddingModel:
             try:
                 start_time = time.time()
                 
-                with httpx.Client(timeout=self.timeout) as client:
-                    response = client.post(
-                        self.api_url,
-                        headers=headers,
-                        json=payload
-                    )
+                # Use InferenceClient's feature_extraction method
+                # Pass single text or list of texts
+                input_data = texts[0] if len(texts) == 1 else texts
+                embeddings = self.client.feature_extraction(
+                    input_data,
+                    model=self.model_name
+                )
                 
                 elapsed = time.time() - start_time
-                
-                # Handle 503 Service Unavailable (model loading)
-                if response.status_code == 503:
-                    error_data = response.json() if response.text else {}
-                    estimated_time = error_data.get("estimated_time", delay)
-                    
-                    logger.warning(
-                        f"Model loading (503) on attempt {attempt + 1}/{self.max_retries}. "
-                        f"Estimated time: {estimated_time}s. Retrying in {delay}s..."
-                    )
-                    
-                    if attempt < self.max_retries - 1:
-                        time.sleep(delay)
-                        delay = min(delay * 2, 60.0)  # Exponential backoff, max 60s
-                        continue
-                    else:
-                        last_error = f"Model failed to load after {self.max_retries} attempts"
-                        break
-                
-                # Handle rate limiting
-                if response.status_code == 429:
-                    logger.error("Rate limit exceeded for Hugging Face API")
-                    raise RuntimeError("Rate limit exceeded. Please try again later.")
-                
-                # Handle authentication errors
-                if response.status_code == 401:
-                    logger.error("Authentication failed for Hugging Face API")
-                    raise RuntimeError("Invalid API key")
-                
-                # Handle other errors
-                if response.status_code != 200:
-                    error_msg = f"API request failed with status {response.status_code}: {response.text}"
-                    logger.error(error_msg)
-                    raise RuntimeError(error_msg)
-                
-                # Success - parse embeddings
-                embeddings = response.json()
                 
                 # Log successful request with timing
                 if elapsed > 10.0:
@@ -178,19 +137,59 @@ class EmbeddingModel:
                 else:
                     logger.debug(f"Generated embeddings for {len(texts)} texts in {elapsed:.2f}s")
                 
-                return embeddings
+                # Ensure we return a list of embeddings
+                if isinstance(embeddings, list) and len(embeddings) > 0:
+                    # Check if it's a single embedding or list of embeddings
+                    if isinstance(embeddings[0], (int, float)):
+                        # Single embedding returned as flat list
+                        return [embeddings]
+                    else:
+                        # List of embeddings
+                        return embeddings
+                else:
+                    # Handle numpy arrays
+                    import numpy as np
+                    if isinstance(embeddings, np.ndarray):
+                        # Convert numpy array to list
+                        if embeddings.ndim == 1:
+                            # Single embedding
+                            return [embeddings.tolist()]
+                        else:
+                            # Multiple embeddings
+                            return embeddings.tolist()
+                    else:
+                        raise RuntimeError(f"Unexpected embedding format: {type(embeddings)}")
                 
-            except httpx.TimeoutException as e:
-                last_error = f"Request timeout after {self.timeout}s"
-                logger.error(f"{last_error} on attempt {attempt + 1}/{self.max_retries}")
+            except Exception as e:
+                error_msg = str(e).lower()
                 
-                if attempt < self.max_retries - 1:
-                    time.sleep(delay)
-                    delay = min(delay * 2, 60.0)
-                    continue
+                # Check if it's a model loading error (503)
+                if "503" in error_msg or "service unavailable" in error_msg or "loading" in error_msg:
+                    logger.warning(
+                        f"Model loading (503) on attempt {attempt + 1}/{self.max_retries}. "
+                        f"Retrying in {delay}s..."
+                    )
                     
-            except httpx.RequestError as e:
-                last_error = f"Network error: {str(e)}"
+                    if attempt < self.max_retries - 1:
+                        time.sleep(delay)
+                        delay = min(delay * 2, 60.0)  # Exponential backoff, max 60s
+                        continue
+                    else:
+                        last_error = f"Model failed to load after {self.max_retries} attempts"
+                        break
+                
+                # Check for rate limiting
+                if "429" in error_msg or "rate limit" in error_msg:
+                    logger.error("Rate limit exceeded for Hugging Face API")
+                    raise RuntimeError("Rate limit exceeded. Please try again later.")
+                
+                # Check for authentication errors
+                if "401" in error_msg or "unauthorized" in error_msg:
+                    logger.error("Authentication failed for Hugging Face API")
+                    raise RuntimeError("Invalid API key")
+                
+                # For other errors, retry with backoff
+                last_error = str(e)
                 logger.error(f"{last_error} on attempt {attempt + 1}/{self.max_retries}")
                 
                 if attempt < self.max_retries - 1:

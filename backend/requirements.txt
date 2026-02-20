@@ -12,3 +12,4 @@ tiktoken
 transformers==4.37.2
 pydantic
 python-multipart==0.0.9
+huggingface-hub

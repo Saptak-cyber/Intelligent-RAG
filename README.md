@@ -57,8 +57,15 @@ LOG_LEVEL=INFO
 3. **Set up Supabase:**
 
 - Create a new Supabase project at https://supabase.com
-- Enable the pgvector extension in your database
+- Go to the SQL Editor in your Supabase dashboard
+- Run the migration file: `backend/migrations/001_create_chunks_table.sql`
+  - This enables pgvector extension
+  - Creates the `document_chunks` table
+  - Creates the `match_chunks` RPC function for similarity search
+  - Sets up necessary indexes
 - Copy your project URL and anon key to `.env`
+
+For detailed database setup instructions, see `backend/migrations/README.md`
 
 4. **Run the backend:**
 
