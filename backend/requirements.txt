@@ -1,0 +1,14 @@
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-dotenv==1.0.0
+pymupdf
+groq==0.4.2
+hypothesis==6.98.3
+pytest
+pytest-asyncio
+supabase==2.3.4
+httpx
+tiktoken
+transformers==4.37.2
+pydantic
+python-multipart==0.0.9
