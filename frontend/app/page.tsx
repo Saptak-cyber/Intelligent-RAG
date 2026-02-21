@@ -38,6 +38,9 @@ export default function Home() {
   const [useStreaming, setUseStreaming] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const streamingMessageRef = useRef<HTMLDivElement>(null)
+  
+  // API URL from environment variable or default to localhost
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   // Load chat history from localStorage on mount
   useEffect(() => {
@@ -127,7 +130,7 @@ export default function Home() {
     let messageIndex = -1
     
     try {
-      const response = await fetch('http://localhost:8000/query/stream', {
+      const response = await fetch(`${API_URL}/query/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -254,7 +257,7 @@ export default function Home() {
 
   const handleRegularSubmit = async (userMessage: string) => {
     try {
-      const response = await fetch('http://localhost:8000/query', {
+      const response = await fetch(`${API_URL}/query`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

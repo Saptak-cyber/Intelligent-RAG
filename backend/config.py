@@ -16,6 +16,12 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 PORT = int(os.getenv("PORT", "8000"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
+# CORS Configuration
+CORS_ORIGINS = os.getenv(
+    "CORS_ORIGINS", 
+    "http://localhost:3000,http://localhost:3001"
+).split(",")
+
 # Model Configuration
 EMBEDDING_MODEL = "sentence-transformers/all-mpnet-base-v2"
 SIMPLE_MODEL = "llama-3.1-8b-instant"
