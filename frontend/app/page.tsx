@@ -35,7 +35,9 @@ export default function Home() {
   const [metadata, setMetadata] = useState<ResponseMetadata | null>(null)
   const [sources, setSources] = useState<Source[]>([])
   const [showDebug, setShowDebug] = useState(true)
+  const [useStreaming, setUseStreaming] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const streamingMessageRef = useRef<HTMLDivElement>(null)
 
   // Load chat history from localStorage on mount
   useEffect(() => {
@@ -113,6 +115,144 @@ export default function Home() {
     setMessages(prev => [...prev, { role: 'user', content: userMessage }])
     setIsLoading(true)
 
+    if (useStreaming) {
+      await handleStreamingSubmit(userMessage)
+    } else {
+      await handleRegularSubmit(userMessage)
+    }
+  }
+
+  const handleStreamingSubmit = async (userMessage: string) => {
+    let accumulatedText = ''
+    let messageIndex = -1
+    
+    try {
+      const response = await fetch('http://localhost:8000/query/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          question: userMessage,
+          conversation_id: conversationId,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to get streaming response')
+      }
+
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+      
+      if (!reader) {
+        throw new Error('No response body')
+      }
+
+      let buffer = ''
+      
+      // Add empty assistant message
+      setMessages(prev => {
+        messageIndex = prev.length
+        return [...prev, { role: 'assistant', content: '' }]
+      })
+      
+      // Wait for DOM to update
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      while (true) {
+        const { done, value } = await reader.read()
+        
+        if (done) break
+
+        // Decode the chunk and add to buffer
+        buffer += decoder.decode(value, { stream: true })
+        
+        // Process complete lines from buffer
+        const lines = buffer.split('\n')
+        // Keep the last incomplete line in buffer
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              
+              if (data.type === 'token') {
+                // Update accumulated text
+                accumulatedText += data.content
+                console.log('Received token:', data.content, 'Total length:', accumulatedText.length)
+                
+                // Update DOM directly for immediate visual feedback
+                if (streamingMessageRef.current) {
+                  streamingMessageRef.current.textContent = accumulatedText
+                  console.log('Updated DOM ref')
+                  // Force browser to paint the update
+                  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+                } else {
+                  console.log('Ref not available yet')
+                }
+                
+                // Also update state periodically (every 10 tokens to reduce re-renders)
+                if (accumulatedText.length % 10 === 0) {
+                  setMessages(prev => {
+                    const newMessages = [...prev]
+                    if (newMessages[messageIndex]) {
+                      newMessages[messageIndex] = {
+                        role: 'assistant',
+                        content: accumulatedText
+                      }
+                    }
+                    return newMessages
+                  })
+                }
+              } else if (data.type === 'metadata') {
+                // Update metadata and sources
+                if (!conversationId) {
+                  setConversationId(data.data.conversation_id)
+                }
+                setMetadata(data.data.metadata)
+                setSources(data.data.sources || [])
+              } else if (data.type === 'error') {
+                throw new Error(data.error.message)
+              }
+            } catch (parseError) {
+              console.error('Error parsing SSE data:', parseError, 'Line:', line)
+            }
+          }
+        }
+      }
+      
+      // Final state update with complete text
+      setMessages(prev => {
+        const newMessages = [...prev]
+        if (newMessages[messageIndex]) {
+          newMessages[messageIndex] = {
+            role: 'assistant',
+            content: accumulatedText
+          }
+        }
+        return newMessages
+      })
+      
+    } catch (error) {
+      console.error('Streaming error:', error)
+      setMessages(prev => {
+        const newMessages = [...prev]
+        if (messageIndex >= 0 && newMessages[messageIndex]) {
+          newMessages[messageIndex] = {
+            role: 'assistant',
+            content: accumulatedText || 'Sorry, I encountered an error during streaming. Please try again.'
+          }
+        }
+        return newMessages
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleRegularSubmit = async (userMessage: string) => {
     try {
       const response = await fetch('http://localhost:8000/query', {
         method: 'POST',
@@ -169,14 +309,26 @@ export default function Home() {
               <h1 className="text-2xl font-bold">ClearPath Support</h1>
               <p className="text-sm text-blue-100">Ask me anything about ClearPath</p>
             </div>
-            {messages.length > 0 && (
+            <div className="flex gap-2">
               <button
-                onClick={clearChat}
-                className="px-4 py-2 bg-blue-900 hover:bg-red-800 rounded-lg text-sm transition-colors"
+                onClick={() => setUseStreaming(!useStreaming)}
+                className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+                  useStreaming 
+                    ? 'bg-green-700 hover:bg-green-800' 
+                    : 'bg-blue-900 hover:bg-blue-800'
+                }`}
               >
-                Clear Chat
+                {useStreaming ? '⚡ Streaming' : '📄 Regular'}
               </button>
-            )}
+              {messages.length > 0 && (
+                <button
+                  onClick={clearChat}
+                  className="px-4 py-2 bg-blue-900 hover:bg-red-800 rounded-lg text-sm transition-colors"
+                >
+                  Clear Chat
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Messages Area */}
@@ -199,7 +351,12 @@ export default function Home() {
                         : 'bg-gray-100 text-gray-900'
                     }`}
                   >
-                    <p className="whitespace-pre-wrap">{message.content}</p>
+                    <p 
+                      className="whitespace-pre-wrap"
+                      ref={index === messages.length - 1 && message.role === 'assistant' ? streamingMessageRef : null}
+                    >
+                      {message.content}
+                    </p>
                   </div>
                 </div>
               ))

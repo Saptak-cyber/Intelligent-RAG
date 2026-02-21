@@ -255,3 +255,182 @@ Instructions:
 Answer:"""
         
         return prompt
+    def generate_stream(
+        self,
+        model: str,
+        prompt: str,
+        max_tokens: int = 500
+    ):
+        """
+        Generate streaming response using Groq API.
+
+        Yields tokens as they arrive from the API, then yields final metadata.
+
+        Args:
+            model: Model name (llama-3.1-8b-instant or llama-3.3-70b-versatile)
+            prompt: Complete prompt with context and query
+            max_tokens: Maximum tokens to generate
+
+        Yields:
+            Dict with either:
+            - {"type": "token", "content": str} for each token
+            - {"type": "metadata", "data": dict} for final metadata
+
+        Raises:
+            LLMClientError: Structured error with code, message, and details
+        """
+        start_time = time.time()
+        accumulated_text = ""
+        tokens_input = 0
+        tokens_output = 0
+
+        try:
+            logger.debug(f"Starting streaming generation with model: {model}")
+
+            # Call Groq API with streaming enabled
+            stream = self.client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=max_tokens,
+                temperature=0.7,
+                stream=True
+            )
+
+            # Stream tokens as they arrive
+            for chunk in stream:
+                if chunk.choices[0].delta.content is not None:
+                    token = chunk.choices[0].delta.content
+                    accumulated_text += token
+                    yield {
+                        "type": "token",
+                        "content": token
+                    }
+
+                # Extract token usage from final chunk if available
+                if hasattr(chunk, 'usage') and chunk.usage is not None:
+                    tokens_input = chunk.usage.prompt_tokens
+                    tokens_output = chunk.usage.completion_tokens
+
+            # Calculate latency
+            latency_ms = int((time.time() - start_time) * 1000)
+
+            # If token counts weren't in stream, estimate them
+            if tokens_output == 0:
+                # Rough estimate: ~4 chars per token
+                tokens_output = len(accumulated_text) // 4
+
+            logger.info(
+                f"Completed streaming response: model={model}, "
+                f"input_tokens={tokens_input}, output_tokens={tokens_output}, "
+                f"latency={latency_ms}ms"
+            )
+
+            # Yield final metadata
+            yield {
+                "type": "metadata",
+                "data": {
+                    "text": accumulated_text,
+                    "tokens_input": tokens_input,
+                    "tokens_output": tokens_output,
+                    "latency_ms": latency_ms,
+                    "model_used": model
+                }
+            }
+
+        except RateLimitError as e:
+            latency_ms = int((time.time() - start_time) * 1000)
+            error = LLMError(
+                code="RATE_LIMIT_ERROR",
+                message="Rate limit exceeded. Please try again in a few moments.",
+                details={
+                    "retry_after": 60,
+                    "model": model,
+                    "latency_ms": latency_ms,
+                    "original_error": str(e)
+                }
+            )
+            logger.error(
+                f"Rate limit error during streaming: model={model}, latency={latency_ms}ms, error={e}",
+                exc_info=True,
+                extra={"error_code": error.code, "error_details": error.details}
+            )
+            raise LLMClientError(error)
+
+        except AuthenticationError as e:
+            latency_ms = int((time.time() - start_time) * 1000)
+            error = LLMError(
+                code="AUTHENTICATION_ERROR",
+                message="Authentication failed. Please check your API key.",
+                details={
+                    "model": model,
+                    "latency_ms": latency_ms,
+                    "original_error": str(e)
+                }
+            )
+            logger.error(
+                f"Authentication error during streaming: model={model}, latency={latency_ms}ms, error={e}",
+                exc_info=True,
+                extra={"error_code": error.code, "error_details": error.details}
+            )
+            raise LLMClientError(error)
+
+        except APITimeoutError as e:
+            latency_ms = int((time.time() - start_time) * 1000)
+            error = LLMError(
+                code="TIMEOUT_ERROR",
+                message="Request timed out. Please try again.",
+                details={
+                    "model": model,
+                    "latency_ms": latency_ms,
+                    "original_error": str(e)
+                }
+            )
+            logger.error(
+                f"Timeout error during streaming: model={model}, latency={latency_ms}ms, error={e}",
+                exc_info=True,
+                extra={"error_code": error.code, "error_details": error.details}
+            )
+            raise LLMClientError(error)
+
+        except APIError as e:
+            latency_ms = int((time.time() - start_time) * 1000)
+            error = LLMError(
+                code="API_ERROR",
+                message=f"Groq API error: {str(e)}",
+                details={
+                    "model": model,
+                    "latency_ms": latency_ms,
+                    "original_error": str(e)
+                }
+            )
+            logger.error(
+                f"API error during streaming: model={model}, latency={latency_ms}ms, error={e}",
+                exc_info=True,
+                extra={"error_code": error.code, "error_details": error.details}
+            )
+            raise LLMClientError(error)
+
+        except Exception as e:
+            latency_ms = int((time.time() - start_time) * 1000)
+            error = LLMError(
+                code="UNKNOWN_ERROR",
+                message=f"Unexpected error during streaming: {str(e)}",
+                details={
+                    "model": model,
+                    "latency_ms": latency_ms,
+                    "original_error": str(e),
+                    "error_type": type(e).__name__
+                }
+            )
+            logger.error(
+                f"Unexpected error during streaming: model={model}, latency={latency_ms}ms, error={e}",
+                exc_info=True,
+                extra={"error_code": error.code, "error_details": error.details}
+            )
+            raise LLMClientError(error)
+

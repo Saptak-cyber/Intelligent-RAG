@@ -5,6 +5,7 @@ import tiktoken
 from typing import List
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from config import PORT
 from models.api import QueryRequest, QueryResponse, ResponseMetadata, TokenUsage, Source
@@ -293,6 +294,193 @@ def _calculate_complexity_score(query: str, classification) -> dict:
         "question_mark_count": question_mark_count,
         "comparison_word_count": comparison_word_count
     }
+@app.post("/query/stream")
+async def query_stream_endpoint(request: QueryRequest):
+    """
+    Streaming query endpoint for the ClearPath RAG Chatbot.
+
+    Processes user queries and streams the response as Server-Sent Events (SSE).
+    Sends tokens progressively as they are generated, followed by final metadata.
+
+    Args:
+        request: QueryRequest with question and optional conversation_id
+
+    Returns:
+        StreamingResponse with SSE format:
+        - data: {type: "token", content: "..."} for each token
+        - data: {type: "metadata", data: {...}} for final metadata
+
+    Raises:
+        HTTPException: For validation errors or API failures
+    """
+    async def generate_stream():
+        """Generator function for streaming response."""
+        start_time = time.time()
+
+        try:
+            # Step 1: Validate request
+            if not request.question or not request.question.strip():
+                yield f"data: {{'error': 'Question field is required and cannot be empty'}}\n\n".encode('utf-8')
+                return
+
+            logger.info(f"Processing streaming query: {request.question[:100]}...")
+
+            # Step 2: Get or create conversation
+            conversation = conversation_manager.get_or_create_conversation(request.conversation_id)
+            conversation_id = conversation.conversation_id
+
+            # Step 3: Classify query using ModelRouter
+            classification = model_router.classify_query(request.question)
+
+            # Step 4: Retrieve relevant chunks (skip if OOD filter triggered)
+            retrieved_chunks: List[ScoredChunk] = []
+            if classification.skip_retrieval:
+                logger.info("Skipping retrieval (OOD filter triggered)")
+            else:
+                retrieved_chunks = retrieval_engine.retrieve(request.question)
+
+            chunks_retrieved = len(retrieved_chunks)
+            logger.info(f"Retrieved {chunks_retrieved} chunks")
+
+            # Step 5: Build prompt with context and conversation history
+            conversation_history = conversation_manager.get_context(conversation_id, max_turns=3)
+
+            # Extract chunk texts for prompt
+            chunk_texts = [chunk.chunk.text for chunk in retrieved_chunks]
+
+            prompt = LLMClient.build_prompt(
+                query=request.question,
+                retrieved_chunks=chunk_texts if chunk_texts else None,
+                conversation_history=conversation_history if conversation_history else None
+            )
+
+            # Step 6: Count tokens using tiktoken (o200k_base for Llama 3)
+            prompt_tokens = len(tiktoken_encoder.encode(prompt))
+
+            # Step 7: Stream response using LLMClient
+            accumulated_text = ""
+            llm_metadata = None
+
+            for chunk in llm_client.generate_stream(
+                model=classification.model_name,
+                prompt=prompt,
+                max_tokens=500
+            ):
+                if chunk["type"] == "token":
+                    # Stream token to client
+                    import json
+                    accumulated_text += chunk["content"]
+                    logger.debug(f"Streaming token: {repr(chunk['content'])}, length: {len(chunk['content'])}")
+                    data = f"data: {json.dumps(chunk)}\n\n"
+                    yield data.encode('utf-8')  # Encode to bytes for proper streaming
+                elif chunk["type"] == "metadata":
+                    # Store metadata for final processing
+                    llm_metadata = chunk["data"]
+
+            # Step 8: Evaluate response using OutputEvaluator
+            evaluator_flags = output_evaluator.evaluate(
+                response=accumulated_text,
+                chunks_retrieved=chunks_retrieved,
+                sources=retrieved_chunks
+            )
+
+            # Step 9: Calculate complexity score for logging
+            complexity_score = _calculate_complexity_score(request.question, classification)
+
+            # Step 10: Log routing decision
+            routing_logger.log_routing_decision(
+                query=request.question,
+                classification=classification.category,
+                model_used=classification.model_name,
+                tokens_input=llm_metadata["tokens_input"],
+                tokens_output=llm_metadata["tokens_output"],
+                latency_ms=llm_metadata["latency_ms"],
+                rule_triggered=classification.rule_triggered,
+                complexity_score=complexity_score,
+                chunks_retrieved=chunks_retrieved,
+                evaluator_flags=evaluator_flags
+            )
+
+            # Step 11: Add turn to conversation history
+            conversation_manager.add_turn(
+                conversation_id=conversation_id,
+                query=request.question,
+                response=accumulated_text
+            )
+
+            # Step 12: Format sources
+            sources = [
+                {
+                    "document": chunk.chunk.document_name,
+                    "page": chunk.chunk.page_number,
+                    "relevance_score": chunk.relevance_score
+                }
+                for chunk in retrieved_chunks
+            ]
+
+            # Step 13: Calculate total latency
+            total_latency_ms = int((time.time() - start_time) * 1000)
+
+            # Step 14: Send final metadata
+            import json
+            final_metadata = {
+                "type": "metadata",
+                "data": {
+                    "metadata": {
+                        "model_used": classification.model_name,
+                        "classification": classification.category,
+                        "tokens": {
+                            "input": llm_metadata["tokens_input"],
+                            "output": llm_metadata["tokens_output"]
+                        },
+                        "latency_ms": total_latency_ms,
+                        "chunks_retrieved": chunks_retrieved,
+                        "evaluator_flags": evaluator_flags
+                    },
+                    "sources": sources,
+                    "conversation_id": conversation_id
+                }
+            }
+            yield f"data: {json.dumps(final_metadata)}\n\n".encode('utf-8')
+
+            logger.info(f"Streaming query processed successfully in {total_latency_ms}ms")
+
+        except LLMClientError as e:
+            # Handle LLM client errors
+            import json
+            logger.error(f"LLM client error during streaming: {e.error.message}")
+            error_data = {
+                "type": "error",
+                "error": {
+                    "code": e.error.code,
+                    "message": e.error.message,
+                    "details": e.error.details
+                }
+            }
+            yield f"data: {json.dumps(error_data)}\n\n".encode('utf-8')
+        except Exception as e:
+            # Handle unexpected errors
+            import json
+            logger.error(f"Unexpected error during streaming: {e}", exc_info=True)
+            error_data = {
+                "type": "error",
+                "error": {
+                    "code": "UNKNOWN_ERROR",
+                    "message": f"Internal server error: {str(e)}"
+                }
+            }
+            yield f"data: {json.dumps(error_data)}\n\n".encode('utf-8')
+
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"  # Disable buffering in nginx
+        }
+    )
+
 
 
 if __name__ == "__main__":
