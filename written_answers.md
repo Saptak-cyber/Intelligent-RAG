@@ -74,3 +74,37 @@ Using tiktoken with o200k_base encoding for accurate Llama 3 token counting:
 **Why Shipped Anyway:** These are acceptable MVP trade-offs. The deterministic routing requirement (no LLM-based classification) prevents conversation-aware routing without significant architecture changes. The groundedness check provides transparency via flags, allowing users to verify answers. Cold start delays affect only the first query and resolve automatically.
 
 **Fix Approach:** (1) Implement conversation-aware routing that tracks evaluator flags and escalates complexity. (2) Add stricter system prompts: "Only answer if information is in the provided context. If uncertain, say 'I don't have information about that.'" (3) Warm up the embedding model at startup with a dummy query to eliminate cold starts.
+
+## AI Usage
+
+This section documents all prompts given to LLMs during the development of this project:
+
+1. "Help me understand how to implement a model router that uses deterministic rules to classify queries as simple or complex"
+
+2. "How can I extract proper nouns from text using regex in Python while handling markdown formatting"
+
+3. "What's the best way to implement retry logic with exponential backoff for API calls in Python"
+
+4. "Explain how to use tiktoken to count tokens for Llama 3 models"
+
+5. "How do I implement contextual heading injection in a document chunking system"
+
+6. "What are common patterns for implementing groundedness checks in RAG systems"
+
+7. "Help me debug why my regex pattern for detecting greetings is matching words like 'help' inside longer sentences"
+
+8. "How can I implement a dynamic k-cutoff for vector similarity search results"
+
+9. "What's the best way to handle HuggingFace Inference API cold starts"
+
+10. "Explain the 'Lost in the Middle' problem in RAG systems and how to mitigate it"
+
+11. "How do I implement conversation-aware routing without using an LLM classifier"
+
+12. "Help me write a system prompt that prevents LLMs from hallucinating features not in the context"
+
+13. "What are best practices for cost optimization in production RAG systems"
+
+14. "How can I distinguish between pure refusals and partial answers in LLM responses"
+
+15. "Help me implement proper noun extraction that handles possessives and markdown list markers"
