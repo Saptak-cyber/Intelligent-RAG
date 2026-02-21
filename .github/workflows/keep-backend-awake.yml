@@ -1,0 +1,46 @@
+name: Keep Backend Awake
+
+# This workflow pings your Render backend every 10 minutes to prevent cold starts
+# To use this:
+# 1. Replace YOUR_BACKEND_URL with your actual Render URL
+# 2. Commit this file to your repository
+# 3. GitHub Actions will automatically run it
+
+on:
+  schedule:
+    # Runs every 10 minutes
+    - cron: '*/10 * * * *'
+  
+  # Allows manual trigger from Actions tab
+  workflow_dispatch:
+
+jobs:
+  ping-backend:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping Backend Wake Endpoint
+        run: |
+          echo "Pinging backend to keep it awake..."
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://intelligent-rag.onrender.com/wake)
+          
+          if [ $response -eq 200 ]; then
+            echo "✅ Backend is awake (HTTP $response)"
+          else
+            echo "⚠️ Backend returned HTTP $response"
+          fi
+      
+      - name: Ping Health Endpoint
+        run: |
+          echo "Checking backend health..."
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://intelligent-rag.onrender.com/health)
+          
+          if [ $response -eq 200 ]; then
+            echo "✅ Backend health check passed (HTTP $response)"
+          else
+            echo "⚠️ Backend health check returned HTTP $response"
+          fi
+
+# Note: This uses GitHub Actions minutes from your account
+# Free tier includes 2,000 minutes/month which is more than enough
+# This workflow uses approximately 144 minutes/month (6 runs/hour * 24 hours * 30 days * ~0.1 min/run)
