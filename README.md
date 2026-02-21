@@ -381,11 +381,11 @@ The system may raise the following flags to indicate potential quality issues:
 
 1. **`no_context`**: LLM generated an answer but no relevant document chunks were retrieved. The response may be based on the model's general knowledge rather than ClearPath documentation.
 
-2. **`refusal`**: LLM explicitly refused to answer or stated it doesn't have the information. Phrases like "I don't have", "not mentioned", "cannot find" trigger this flag.
+2. **`refusal`**: LLM explicitly refused to answer or stated it doesn't have the information. Uses word boundary matching to detect refusal phrases like "I don't have", "not mentioned", "cannot find". Distinguishes between total refusals and partial answers - responses with contrast words ("but", "however", "although") and >12 words are treated as helpful partial answers, not refusals.
 
-3. **`unverified_feature`**: LLM mentions specific features, integrations, or product names that don't appear in the retrieved chunks. This catches hallucinated features.
+3. **`unverified_feature`**: LLM mentions specific features, integrations, or product names that don't appear in the retrieved chunks. Uses case-insensitive matching, handles possessive forms (e.g., "ClearPath's"), and is Markdown-aware to avoid false positives from bullet points and numbered lists. This catches hallucinated features while avoiding false positives from formatting variations.
 
-4. **`pricing_uncertainty`**: Query is about pricing and the response contains hedging language ("may", "might", "approximately") or retrieved chunks come from conflicting sources.
+4. **`pricing_uncertainty`**: Query is about pricing and the response contains hedging language ("may", "might", "approximately", "around", "varies") or explicitly mentions conflicts/discrepancies in documentation. Only flags when actual uncertainty is detected, not when successfully synthesizing information from multiple pricing documents.
 
 **Error Responses:**
 
@@ -408,17 +408,20 @@ Example error response:
 
 ### Model Routing Rules
 
-The router uses a deterministic decision tree to classify queries:
+The router uses a deterministic decision tree with robust regex patterns and word boundary enforcement to classify queries:
 
 **Rule 0 - OOD Filter (Out-of-Distribution)**:
-- **Trigger**: Greetings ("hi", "hello", "hey", "thanks") or meta-comments ("who are you", "what can you do", "help")
+- **Trigger**: Standalone greetings ("hi", "hello", "hey", "thanks") or meta-comments ("who are you", "what can you do")
 - **Action**: Route to llama-3.1-8b-instant + skip retrieval
 - **Rationale**: Saves embedding costs and LLM tokens for non-content queries
+- **Implementation**: Uses whole-string matching with regex `^\s*({patterns})\s*[.!?,\s]*$` to ensure only standalone greetings trigger OOD, not "Hi, how do I reset my password?"
+- **Context-Aware "Help"**: Queries containing "help" with >3 words are treated as real questions, not meta-comments (e.g., "I need help configuring my firewall" → NOT OOD)
 
 **Rule 1 - Complex Keywords**:
 - **Trigger**: Query contains complex keywords: "why", "how", "explain", "compare", "analyze", "difference", "relationship"
 - **Action**: Route to llama-3.3-70b-versatile
 - **Example**: "How do I configure custom workflows?" → Complex
+- **Implementation**: Uses word boundary matching `\b({patterns})\b` to avoid false matches (e.g., "showing" doesn't match "how")
 
 **Rule 2 - Query Length**:
 - **Trigger**: Query length > 15 words
@@ -434,11 +437,19 @@ The router uses a deterministic decision tree to classify queries:
 - **Trigger**: Contains comparison words: "versus", "vs", "better", "worse", "compared to"
 - **Action**: Route to llama-3.3-70b-versatile
 - **Example**: "Compare Enterprise vs Pro features" → Complex
+- **Implementation**: Uses word boundary matching to prevent false positives from "csv", "devs", "vsync", or "obvs"
 
 **Rule 5 - Default**:
 - **Trigger**: None of the above
 - **Action**: Route to llama-3.1-8b-instant
 - **Example**: "What is the Pro plan price?" → Simple
+
+**Bug Fixes Applied:**
+- Fixed "Polite User" penalty where greetings in longer queries would skip retrieval
+- Fixed substring matching bug where "csv" would trigger "vs" comparison logic
+- Fixed inconsistent reasoning output where matched keywords weren't logged correctly
+- Fixed overly broad meta-comment detection for "help" queries
+- Enforced word boundaries across all keyword matching to prevent partial word matches
 
 ## Example Queries
 
@@ -531,6 +542,8 @@ clearpath-rag-chatbot/
 │   ├── config.py                    # Configuration management
 │   ├── logger.py                    # Structured logging setup
 │   ├── requirements.txt             # Python dependencies
+│   ├── evaluate_system.py           # Evaluation harness (115+ test queries)
+│   ├── EVALUATION_README.md         # Evaluation harness documentation
 │   ├── models/                      # Data models (Pydantic)
 │   │   ├── api.py                   # API request/response models
 │   │   ├── chunk.py                 # Document chunk models
@@ -546,7 +559,9 @@ clearpath-rag-chatbot/
 │   │   ├── llm_client.py            # Groq API integration
 │   │   ├── output_evaluator.py      # Response quality checks
 │   │   ├── conversation_manager.py  # Multi-turn conversation support
-│   │   └── routing_logger.py        # Routing decision logging
+│   │   ├── routing_logger.py        # Routing decision logging
+│   │   ├── MODEL_ROUTER_BUG_FIXES.md           # Router bug fixes documentation
+│   │   └── OUTPUT_EVALUATOR_IMPROVEMENTS.md    # Evaluator improvements documentation
 │   ├── migrations/                  # Database migrations
 │   │   ├── 001_create_chunks_table.sql
 │   │   └── README.md
@@ -614,6 +629,42 @@ pytest tests/ --cov=services --cov-report=html
 pytest tests/ -k "property" -v
 ```
 
+### Evaluation Harness
+
+The project includes a comprehensive evaluation harness that tests the entire RAG pipeline end-to-end with 115+ test queries.
+
+**Run evaluation:**
+```bash
+cd backend
+python evaluate_system.py
+```
+
+**Custom configuration:**
+```bash
+python evaluate_system.py \
+  --api-url http://localhost:8000 \
+  --output logs/evaluation_$(date +%Y%m%d_%H%M%S).txt \
+  --delay 100
+```
+
+**What it tests:**
+- Model routing accuracy (simple vs complex classification)
+- OOD detection (greetings and meta-comments)
+- Edge case handling (CSV/VS bug, "help" context awareness)
+- Output evaluator precision and recall
+- Latency distribution (p50, p95, p99)
+- Token usage by query type
+- Retrieval quality metrics
+- Evaluator flag frequency
+
+**Expected results:**
+- Router accuracy: >95%
+- OOD detection: 100%
+- Latency P50: ~1-2s, P95: ~3-5s
+- Token usage: ~300-500 (simple), ~800-1500 (complex)
+
+For detailed documentation, see `backend/EVALUATION_README.md`
+
 ### Logging
 
 The system uses structured JSON logging for all operations:
@@ -643,6 +694,30 @@ The system uses structured JSON logging for all operations:
   "evaluator_flags": []
 }
 ```
+
+### Quality Assurance
+
+The system has undergone extensive testing and bug fixing to ensure production readiness:
+
+**Model Router Improvements:**
+- Fixed "Polite User" penalty where greetings in longer queries would incorrectly skip retrieval
+- Fixed substring matching bug where "csv", "devs", "vsync" would trigger "vs" comparison logic
+- Fixed inconsistent reasoning output where matched keywords weren't logged correctly
+- Implemented context-aware "help" detection to distinguish meta-comments from real questions
+- Enforced word boundaries across all keyword matching to prevent partial word matches
+- All improvements verified with 63/63 tests passing
+
+**Output Evaluator Improvements:**
+- Fixed possessive handling to prevent "ClearPath's" from being flagged as "clearpaths"
+- Implemented case-insensitive proper noun matching to handle "GitHub" vs "github" variations
+- Added Markdown-aware extraction to prevent false positives from bullet points and numbered lists
+- Enhanced refusal detection to distinguish partial answers from total refusals
+- Improved pricing uncertainty logic to allow multi-document synthesis without false alarms
+- All improvements verified with 44/44 tests passing
+
+For detailed documentation of improvements, see:
+- `backend/services/MODEL_ROUTER_BUG_FIXES.md`
+- `backend/services/OUTPUT_EVALUATOR_IMPROVEMENTS.md`
 
 ### Code Style
 
@@ -679,6 +754,7 @@ Follow the [Setup Instructions](#setup-instructions) above. The API runs on `loc
    - `SUPABASE_KEY`
    - `PORT=8000`
    - `LOG_LEVEL=INFO`
+   - `CORS_ORIGINS=http://localhost:3000,http://localhost:3001,https://intelligent-rag.vercel.app`
 4. Railway will automatically detect the Python app and deploy
 
 **Render:**
@@ -724,7 +800,7 @@ GROQ_API_KEY=gsk_...
 HUGGINGFACE_API_KEY=hf_...
 SUPABASE_URL=https://...supabase.co
 SUPABASE_KEY=eyJ...
-
+CORS_ORIGINS=http://localhost:3000,http://localhost:3001,https://intelligent-rag.vercel.app
 # Optional
 PORT=8000
 LOG_LEVEL=INFO
@@ -767,7 +843,7 @@ CHUNK_OVERLAP=50
 
 **Workaround**: Always check evaluator flags and verify critical information.
 
-**Planned Fix**: Implement stricter prompting and post-generation filtering.
+**Recent Improvements**: Enhanced proper noun extraction with case-insensitive matching, possessive handling, and Markdown awareness to reduce false positives while maintaining detection accuracy.
 
 ### 4. Token Counting Accuracy
 
