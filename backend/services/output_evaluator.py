@@ -46,6 +46,32 @@ class OutputEvaluator:
         "charge"
     ]
     
+    # Phrases indicating conflicting or unclear documentation
+    CONFLICT_PHRASES = [
+        "conflict",
+        "contradict",
+        "contradictory",
+        "different prices",
+        "inconsistent",
+        "discrepancy",
+        "unclear",
+        "not explicitly stated",
+        "multiple prices listed",
+        "differing information"
+    ]
+    
+    # Indicators that the model is providing a partial answer rather than a total refusal
+    PARTIAL_ANSWER_INDICATORS = [
+        "but",
+        "however",
+        "although",
+        "on the other hand",
+        "does mention",
+        "is available",
+        "instead",
+        "alternatively"
+    ]
+    
     def evaluate(
         self,
         response: str,
@@ -101,12 +127,34 @@ class OutputEvaluator:
     
     def _is_refusal(self, response: str) -> bool:
         """
-        Detect when LLM explicitly refuses to answer.
-        
-        Checks for refusal phrases in the response.
+        Detect when LLM explicitly refuses to answer the entirety of the question.
+        Avoids flagging partial answers where the LLM provides some valid information.
         """
         response_lower = response.lower()
-        return any(phrase in response_lower for phrase in self.REFUSAL_PHRASES)
+        
+        # 1. Check for refusal phrases using regex word boundaries
+        # This prevents "I cannot" from matching inside larger words (if any existed)
+        has_refusal = False
+        for phrase in self.REFUSAL_PHRASES:
+            if re.search(rf'\b{re.escape(phrase)}\b', response_lower):
+                has_refusal = True
+                break
+        
+        if not has_refusal:
+            return False
+        
+        # 2. If a refusal phrase is found, check if it's a partial answer.
+        # Partial answers usually pivot with a contrast word to give the info they DO have.
+        has_contrast = any(indicator in response_lower for indicator in self.PARTIAL_ANSWER_INDICATORS)
+        
+        # 3. Pure refusals are typically very short ("I'm sorry, I don't know.").
+        # If the response has a contrast word AND is long enough to contain real info,
+        # we treat it as a successful partial answer, not a refusal.
+        word_count = len(response.split())
+        if has_contrast and word_count > 12:
+            return False
+        
+        return True
     
     def _has_unverified_features(
         self,
@@ -133,22 +181,27 @@ class OutputEvaluator:
         unverified_nouns = response_proper_nouns - chunks_proper_nouns
         
         # Filter out common words that might be capitalized but aren't features
-        # (e.g., "The", "I", "A", single letters, very short words)
+        # Note: These are now lowercase to match the updated extractor logic
+        stop_words = {
+            "the", "this", "that", "these", "those", "it", "they", "we", "you",
+            "a", "an", "and", "or", "but", "for"
+        }
+        
         significant_unverified = {
             noun for noun in unverified_nouns
-            if len(noun) > 2 and noun not in {"The", "This", "That", "These", "Those"}
+            if len(noun) > 2 and noun not in stop_words
         }
         
         return len(significant_unverified) > 0
     
     def _extract_proper_nouns(self, text: str) -> Set[str]:
         """
-        Extract proper nouns from text using regex patterns.
+        Extract proper nouns from text using regex patterns, handling Markdown
+        and normalizing casing to prevent false positives.
         
         Looks for:
         - Capitalized words (potential product names, features)
         - Integration names (e.g., "Slack", "GitHub")
-        - Multi-word proper nouns (e.g., "Pro Plan")
         """
         proper_nouns = set()
         
@@ -156,7 +209,10 @@ class OutputEvaluator:
         # Look for words that are capitalized in the middle of sentences
         words = text.split()
         for i, word in enumerate(words):
-            # Clean punctuation
+            # Strip possessives first to avoid "ClearPath's" becoming "ClearPaths"
+            word = word.replace("'s", "").replace("\u2019s", "")
+            
+            # Clean remaining punctuation
             clean_word = re.sub(r'[^\w\s-]', '', word)
             
             # Skip if empty after cleaning
@@ -165,25 +221,35 @@ class OutputEvaluator:
             
             # Check if word is capitalized
             if clean_word[0].isupper():
-                # Skip if it's the first word after sentence-ending punctuation
-                if i > 0 and not words[i-1].rstrip().endswith(('.', '!', '?', ':')):
-                    proper_nouns.add(clean_word)
-                # Also add if it's clearly a proper noun (all caps or mixed case)
-                elif clean_word.isupper() or (clean_word[0].isupper() and any(c.isupper() for c in clean_word[1:])):
-                    proper_nouns.add(clean_word)
+                is_sentence_start = (i == 0)
+                
+                # Check previous word for sentence terminators or markdown markers
+                if i > 0:
+                    prev_word = words[i-1].strip()
+                    # Matches punctuation endings OR markdown list markers (e.g., -, *, +, >, 1., 1))
+                    if (prev_word.endswith(('.', '!', '?', ':')) or 
+                        re.match(r'^(\d+[.)]|[-*+>])$', prev_word)):
+                        is_sentence_start = True
+                
+                # Add if it's mid-sentence
+                if not is_sentence_start:
+                    proper_nouns.add(clean_word.lower())
+                # Add if it's clearly a proper noun (all caps or camelCase) even at start of sentence
+                elif clean_word.isupper() or any(c.isupper() for c in clean_word[1:]):
+                    proper_nouns.add(clean_word.lower())
         
-        # Pattern 2: Common integration/tool names (case-insensitive search, case-sensitive storage)
+        # Pattern 2: Common integration/tool names (case-insensitive search, lowercase storage)
         integration_patterns = [
-            r'\b(Slack|GitHub|Jira|Trello|Asana|Monday|Notion|Confluence)\b',
-            r'\b(Google|Microsoft|Apple|Amazon|Salesforce)\b',
-            r'\b(API|REST|GraphQL|OAuth|SSO|SAML)\b'
+            r'\b(slack|github|jira|trello|asana|monday|notion|confluence)\b',
+            r'\b(google|microsoft|apple|amazon|salesforce)\b',
+            r'\b(api|rest|graphql|oauth|sso|saml)\b'
         ]
         
         for pattern in integration_patterns:
             matches = re.finditer(pattern, text, re.IGNORECASE)
             for match in matches:
-                # Store with original capitalization from text
-                proper_nouns.add(match.group(0))
+                # Store as lowercase to ensure case-insensitive set difference
+                proper_nouns.add(match.group(0).lower())
         
         return proper_nouns
     
@@ -193,9 +259,9 @@ class OutputEvaluator:
         sources: List[ScoredChunk]
     ) -> bool:
         """
-        Detect pricing-related responses with uncertainty or conflicting sources.
+        Detect pricing-related responses that express uncertainty or flag conflicting sources.
         
-        Condition: Query mentions pricing AND (hedging language OR conflicting sources)
+        Condition: Response mentions pricing AND (uses hedging language OR explicitly mentions conflicts)
         """
         response_lower = response.lower()
         
@@ -207,7 +273,7 @@ class OutputEvaluator:
         if not is_pricing_related:
             return False
         
-        # Check for hedging language
+        # Check for hedging language (e.g., "might be", "approximately")
         has_hedging = any(
             phrase in response_lower for phrase in self.HEDGING_PHRASES
         )
@@ -215,18 +281,12 @@ class OutputEvaluator:
         if has_hedging:
             return True
         
-        # Check for conflicting sources (multiple different documents about pricing)
-        if len(sources) >= 2:
-            # Get unique document names
-            doc_names = set(chunk.chunk.document_name for chunk in sources)
-            
-            # If multiple different pricing-related documents, might be conflicting
-            pricing_docs = [
-                doc for doc in doc_names
-                if any(keyword in doc.lower() for keyword in self.PRICING_KEYWORDS)
-            ]
-            
-            if len(pricing_docs) >= 2:
-                return True
+        # Check for explicit mention of conflicting or unclear documentation
+        has_conflict = any(
+            phrase in response_lower for phrase in self.CONFLICT_PHRASES
+        )
+        
+        if has_conflict:
+            return True
         
         return False
