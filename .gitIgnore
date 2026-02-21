@@ -17,3 +17,8 @@ backend/INGESTION_README.md
 TASK_15_CHECKPOINT_VERIFICATION.md
 backend/services/MODEL_ROUTER_BUG_FIXES.md
 backend/services/OUTPUT_EVALUATOR_IMPROVEMENTS.md
+tests/
+backend/verify_chunk_storage.py
+backend/query_all_chunks.py
+backend/export_full_chunks.py
+tests/test_output_evaluator.py
