@@ -36,11 +36,47 @@ export default function Home() {
   const [sources, setSources] = useState<Source[]>([])
   const [showDebug, setShowDebug] = useState(true)
   const [useStreaming, setUseStreaming] = useState(false)
+  const [isWakingUp, setIsWakingUp] = useState(false)
+  const [backendStatus, setBackendStatus] = useState<'unknown' | 'awake' | 'sleeping'>('unknown')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const streamingMessageRef = useRef<HTMLDivElement>(null)
   
   // API URL from environment variable or default to localhost
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+  // Wake up backend on mount
+  useEffect(() => {
+    const wakeUpBackend = async () => {
+      try {
+        setIsWakingUp(true)
+        const startTime = Date.now()
+        
+        const response = await fetch(`${API_URL}/wake`, {
+          method: 'GET',
+          signal: AbortSignal.timeout(30000) // 30 second timeout
+        })
+        
+        const elapsed = Date.now() - startTime
+        
+        if (response.ok) {
+          setBackendStatus('awake')
+          // If it took more than 5 seconds, it was likely a cold start
+          if (elapsed > 5000) {
+            console.log(`Backend woke up after ${elapsed}ms (cold start detected)`)
+          }
+        } else {
+          setBackendStatus('sleeping')
+        }
+      } catch (error) {
+        console.error('Failed to wake backend:', error)
+        setBackendStatus('sleeping')
+      } finally {
+        setIsWakingUp(false)
+      }
+    }
+    
+    wakeUpBackend()
+  }, [API_URL])
 
   // Load chat history from localStorage on mount
   useEffect(() => {
@@ -130,6 +166,9 @@ export default function Home() {
     let messageIndex = -1
     
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
+      
       const response = await fetch(`${API_URL}/query/stream`, {
         method: 'POST',
         headers: {
@@ -139,7 +178,10 @@ export default function Home() {
           question: userMessage,
           conversation_id: conversationId,
         }),
+        signal: controller.signal
       })
+
+      clearTimeout(timeoutId)
 
       if (!response.ok) {
         throw new Error('Failed to get streaming response')
@@ -238,14 +280,28 @@ export default function Home() {
         return newMessages
       })
       
+      setBackendStatus('awake')
     } catch (error) {
       console.error('Streaming error:', error)
+      
+      let errorMessage = accumulatedText || 'Sorry, I encountered an error during streaming. Please try again.'
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          errorMessage = 'Request timed out. The backend might be waking up from a cold start. Please try again in a moment.'
+          setBackendStatus('sleeping')
+        } else if (error.message.includes('fetch')) {
+          errorMessage = 'Unable to connect to the backend. It might be starting up. Please wait a moment and try again.'
+          setBackendStatus('sleeping')
+        }
+      }
+      
       setMessages(prev => {
         const newMessages = [...prev]
         if (messageIndex >= 0 && newMessages[messageIndex]) {
           newMessages[messageIndex] = {
             role: 'assistant',
-            content: accumulatedText || 'Sorry, I encountered an error during streaming. Please try again.'
+            content: errorMessage
           }
         }
         return newMessages
@@ -257,6 +313,9 @@ export default function Home() {
 
   const handleRegularSubmit = async (userMessage: string) => {
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
+      
       const response = await fetch(`${API_URL}/query`, {
         method: 'POST',
         headers: {
@@ -266,7 +325,10 @@ export default function Home() {
           question: userMessage,
           conversation_id: conversationId,
         }),
+        signal: controller.signal
       })
+
+      clearTimeout(timeoutId)
 
       if (!response.ok) {
         throw new Error('Failed to get response')
@@ -283,11 +345,25 @@ export default function Home() {
       setSources(data.sources || [])
 
       setMessages(prev => [...prev, { role: 'assistant', content: data.answer }])
+      setBackendStatus('awake')
     } catch (error) {
       console.error('Error:', error)
+      
+      let errorMessage = 'Sorry, I encountered an error. Please try again.'
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          errorMessage = 'Request timed out. The backend might be waking up from a cold start. Please try again in a moment.'
+          setBackendStatus('sleeping')
+        } else if (error.message.includes('fetch')) {
+          errorMessage = 'Unable to connect to the backend. It might be starting up. Please wait a moment and try again.'
+          setBackendStatus('sleeping')
+        }
+      }
+      
       setMessages(prev => [...prev, { 
         role: 'assistant', 
-        content: 'Sorry, I encountered an error. Please try again.' 
+        content: errorMessage
       }])
     } finally {
       setIsLoading(false)
@@ -336,7 +412,19 @@ export default function Home() {
 
           {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {messages.length === 0 ? (
+            {isWakingUp && (
+              <div className="text-center text-gray-600 mt-20 space-y-4">
+                <div className="flex justify-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                </div>
+                <div>
+                  <p className="text-lg font-semibold">Waking up the backend...</p>
+                  <p className="text-sm mt-2">This may take 30-60 seconds on first load (Render cold start)</p>
+                  <p className="text-xs text-gray-500 mt-1">Subsequent requests will be much faster!</p>
+                </div>
+              </div>
+            )}
+            {!isWakingUp && messages.length === 0 ? (
               <div className="text-center text-gray-500 mt-20">
                 <p className="text-lg">Welcome to ClearPath Support!</p>
                 <p className="text-sm mt-2">Ask me anything about ClearPath features, pricing, or usage.</p>
@@ -380,6 +468,11 @@ export default function Home() {
 
           {/* Input Area */}
           <div className="border-t border-gray-200 p-4 flex-shrink-0">
+            {backendStatus === 'sleeping' && (
+              <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                ⚠️ Backend is currently unavailable. Please wait a moment and try again.
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="flex space-x-2">
               <textarea
                 value={input}
@@ -387,7 +480,7 @@ export default function Home() {
                 onKeyDown={handleKeyDown}
                 placeholder="Type your question... (Shift+Enter for new line)"
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 resize-none"
-                disabled={isLoading}
+                disabled={isLoading || isWakingUp}
                 rows={1}
                 style={{ minHeight: '42px', maxHeight: '120px' }}
                 onInput={(e) => {
@@ -398,7 +491,7 @@ export default function Home() {
               />
               <button
                 type="submit"
-                disabled={isLoading || !input.trim()}
+                disabled={isLoading || !input.trim() || isWakingUp}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors self-end"
               >
                 Send

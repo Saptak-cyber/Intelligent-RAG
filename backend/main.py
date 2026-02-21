@@ -102,6 +102,13 @@ async def health():
         "service": "clearpath-rag-chatbot",
         "version": "1.0.0"
     }
+@app.get("/wake")
+async def wake():
+    """
+    Lightweight wake-up endpoint for cold start detection.
+    Returns immediately to signal the service is awake.
+    """
+    return {"status": "awake", "timestamp": time.time()}
 
 
 @app.post("/query", response_model=QueryResponse)
