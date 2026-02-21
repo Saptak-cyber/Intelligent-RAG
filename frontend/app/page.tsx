@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -35,9 +35,76 @@ export default function Home() {
   const [metadata, setMetadata] = useState<ResponseMetadata | null>(null)
   const [sources, setSources] = useState<Source[]>([])
   const [showDebug, setShowDebug] = useState(true)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // Load chat history from localStorage on mount
+  useEffect(() => {
+    const savedMessages = localStorage.getItem('chatMessages')
+    const savedConversationId = localStorage.getItem('conversationId')
+    const savedMetadata = localStorage.getItem('chatMetadata')
+    const savedSources = localStorage.getItem('chatSources')
+
+    if (savedMessages) {
+      setMessages(JSON.parse(savedMessages))
+    }
+    if (savedConversationId) {
+      setConversationId(savedConversationId)
+    }
+    if (savedMetadata) {
+      setMetadata(JSON.parse(savedMetadata))
+    }
+    if (savedSources) {
+      setSources(JSON.parse(savedSources))
+    }
+  }, [])
+
+  // Save chat history to localStorage whenever it changes
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem('chatMessages', JSON.stringify(messages))
+    }
+  }, [messages])
+
+  useEffect(() => {
+    if (conversationId) {
+      localStorage.setItem('conversationId', conversationId)
+    }
+  }, [conversationId])
+
+  useEffect(() => {
+    if (metadata) {
+      localStorage.setItem('chatMetadata', JSON.stringify(metadata))
+    }
+  }, [metadata])
+
+  useEffect(() => {
+    if (sources.length > 0) {
+      localStorage.setItem('chatSources', JSON.stringify(sources))
+    }
+  }, [sources])
+
+  // Auto-scroll to bottom when messages change or loading state changes
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, isLoading])
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  const clearChat = () => {
+    setMessages([])
+    setConversationId(null)
+    setMetadata(null)
+    setSources([])
+    localStorage.removeItem('chatMessages')
+    localStorage.removeItem('conversationId')
+    localStorage.removeItem('chatMetadata')
+    localStorage.removeItem('chatSources')
+  }
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
     
     if (!input.trim() || isLoading) return
 
@@ -84,19 +151,36 @@ export default function Home() {
     }
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSubmit()
+    }
+  }
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-6 bg-gradient-to-b from-gray-50 to-gray-100">
-      <div className="w-full max-w-7xl flex gap-4">
+    <main className="flex min-h-screen flex-col p-4 bg-gradient-to-b from-gray-50 to-gray-100">
+      <div className="w-full max-w-7xl mx-auto flex gap-4 h-[calc(100vh-2rem)]">
         {/* Chat Interface */}
-        <div className="flex-1 bg-white rounded-lg shadow-lg overflow-hidden">
+        <div className="flex-1 bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
           {/* Header */}
-          <div className="bg-blue-600 text-white p-4">
-            <h1 className="text-2xl font-bold">ClearPath Support</h1>
-            <p className="text-sm text-blue-100">Ask me anything about ClearPath</p>
+          <div className="bg-blue-600 text-white p-4 flex justify-between items-center flex-shrink-0">
+            <div>
+              <h1 className="text-2xl font-bold">ClearPath Support</h1>
+              <p className="text-sm text-blue-100">Ask me anything about ClearPath</p>
+            </div>
+            {messages.length > 0 && (
+              <button
+                onClick={clearChat}
+                className="px-4 py-2 bg-blue-900 hover:bg-red-800 rounded-lg text-sm transition-colors"
+              >
+                Clear Chat
+              </button>
+            )}
           </div>
 
           {/* Messages Area */}
-          <div className="h-[500px] overflow-y-auto p-6 space-y-4">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {messages.length === 0 ? (
               <div className="text-center text-gray-500 mt-20">
                 <p className="text-lg">Welcome to ClearPath Support!</p>
@@ -131,23 +215,31 @@ export default function Home() {
                 </div>
               </div>
             )}
+            <div ref={messagesEndRef} />
           </div>
 
           {/* Input Area */}
-          <div className="border-t border-gray-200 p-4">
+          <div className="border-t border-gray-200 p-4 flex-shrink-0">
             <form onSubmit={handleSubmit} className="flex space-x-2">
-              <input
-                type="text"
+              <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Type your question..."
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                onKeyDown={handleKeyDown}
+                placeholder="Type your question... (Shift+Enter for new line)"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 resize-none"
                 disabled={isLoading}
+                rows={1}
+                style={{ minHeight: '42px', maxHeight: '120px' }}
+                onInput={(e) => {
+                  const target = e.target as HTMLTextAreaElement
+                  target.style.height = 'auto'
+                  target.style.height = Math.min(target.scrollHeight, 120) + 'px'
+                }}
               />
               <button
                 type="submit"
                 disabled={isLoading || !input.trim()}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors self-end"
               >
                 Send
               </button>
@@ -156,8 +248,8 @@ export default function Home() {
         </div>
 
         {/* Debug Panel */}
-        <div className="w-96 bg-white rounded-lg shadow-lg overflow-hidden">
-          <div className="bg-gray-800 text-white p-4 flex justify-between items-center">
+        <div className="w-96 bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
+          <div className="bg-gray-800 text-white p-4 flex justify-between items-center flex-shrink-0">
             <h2 className="text-lg font-bold">Debug Panel</h2>
             <button
               onClick={() => setShowDebug(!showDebug)}
@@ -168,7 +260,7 @@ export default function Home() {
           </div>
 
           {showDebug && (
-            <div className="h-[564px] overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {!metadata ? (
                 <div className="text-center text-gray-500 mt-20">
                   <p className="text-sm">Send a message to see debug information</p>
