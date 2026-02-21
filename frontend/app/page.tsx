@@ -35,7 +35,7 @@ export default function Home() {
   const [metadata, setMetadata] = useState<ResponseMetadata | null>(null)
   const [sources, setSources] = useState<Source[]>([])
   const [showDebug, setShowDebug] = useState(true)
-  const [useStreaming, setUseStreaming] = useState(false)
+  const [useStreaming, setUseStreaming] = useState(true)
   const [isWakingUp, setIsWakingUp] = useState(false)
   const [backendStatus, setBackendStatus] = useState<'unknown' | 'awake' | 'sleeping'>('unknown')
   const messagesEndRef = useRef<HTMLDivElement>(null)
