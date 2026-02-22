@@ -2,6 +2,72 @@
 
 A customer support chatbot for ClearPath (a fictional SaaS project management tool) that answers user questions by retrieving relevant content from 30 PDF documentation files and generating responses using Large Language Models via the Groq API.
 
+## 🚀 Quick Start
+
+### How to Run Locally
+
+**Backend (Terminal 1):**
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+# Configure .env file (see Setup Instructions below)
+python main.py
+```
+
+**Frontend (Terminal 2):**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+**Access:** Open http://localhost:3000 in your browser
+
+### Groq Models Used
+
+This system uses exactly two Groq models as specified:
+
+| Model | Groq String | Use Case |
+|-------|-------------|----------|
+| Llama 3.1 8B | `llama-3.1-8b-instant` | Simple queries (factual lookups, greetings, yes/no questions) |
+| Llama 3.3 70B | `llama-3.3-70b-versatile` | Complex queries (multi-step reasoning, comparisons, analysis) |
+
+**Environment Configuration:**
+- `GROQ_API_KEY`: Your Groq API key from https://console.groq.com
+- `HUGGINGFACE_API_KEY`: Your Hugging Face API key for embeddings
+- `SUPABASE_URL`: Your Supabase project URL
+- `SUPABASE_KEY`: Your Supabase anon key
+
+See [Setup Instructions](#setup-instructions) for detailed configuration.
+
+### Bonus Challenges Completed
+
+✅ **Conversation Memory** - Multi-turn conversation support with context retention across turns. Maintains last 3 turns in conversation history. See `backend/services/conversation_manager.py` and `backend/CONVERSATION_MANAGER_IMPLEMENTATION.md` for implementation details.
+
+✅ **Streaming** - Token-by-token streaming support with two modes: streaming and regular. The frontend allows users to toggle between modes. Streaming provides real-time response generation while regular mode returns complete responses. Note: Structured output parsing (evaluator flags, metadata extraction) runs after streaming completes to avoid breaking the stream.
+
+✅ **Eval Harness** - Comprehensive evaluation system with 115+ test queries covering routing accuracy, OOD detection, evaluator precision/recall, and edge cases. Run with `python backend/evaluate_system.py`. See `backend/EVALUATION_README.md` for documentation.
+
+✅ **Live Deploy** - Deployed on AWS EC2 (backend) and Vercel (frontend) with HTTPS via Caddy + DuckDNS. Backend: https://clearpath-backend.duckdns.org. See [Deployment](#deployment) section for details.
+
+### Known Issues & Limitations
+
+1. **Stateless Router**: Router only examines current query, not conversation history. Follow-up questions like "How do I do it?" may route incorrectly if they're grammatically simple despite requiring complex reasoning.
+
+2. **Hugging Face Cold Start**: First query after inactivity takes 15-20 seconds due to model loading on free tier. Subsequent queries are fast (~1-2s).
+
+3. **Groundedness Check Limitations**: Evaluator flags hallucinated features but doesn't prevent them. Always verify critical information, especially for integrations and pricing.
+
+4. **Token Counting Approximation**: Uses tiktoken with o200k_base encoding which may not perfectly match Groq's tokenizer. Expect 5-10% variance in reported vs actual token usage.
+
+5. **Rate Limiting**: Free tier API limits may cause 503 errors under high load. Implement exponential backoff for production use.
+
+See [Known Issues](#known-issues) section for detailed explanations and workarounds.
+
+---
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -405,6 +471,76 @@ Example error response:
     }
   }
 }
+```
+
+#### POST /query/stream
+
+Streaming query endpoint for real-time token-by-token response generation.
+
+**Request Body:**
+```json
+{
+  "question": "What is the price of the Pro plan?",
+  "conversation_id": "conv_abc123"  // Optional, for multi-turn conversations
+}
+```
+
+**Request Fields:**
+- Same as `/query` endpoint
+
+**Response:**
+- **Content-Type**: `text/event-stream`
+- **Format**: Server-Sent Events (SSE)
+
+**Event Types:**
+
+1. **`token`** - Individual response tokens as they're generated
+```
+data: {"type": "token", "content": "The"}
+data: {"type": "token", "content": " Pro"}
+data: {"type": "token", "content": " plan"}
+```
+
+2. **`metadata`** - Processing metadata (sent after streaming completes)
+```
+data: {"type": "metadata", "data": {
+  "model_used": "llama-3.3-70b-versatile",
+  "classification": "complex",
+  "tokens": {"input": 1234, "output": 156},
+  "latency_ms": 847,
+  "chunks_retrieved": 3,
+  "evaluator_flags": []
+}}
+```
+
+3. **`sources`** - Retrieved document chunks (sent after streaming completes)
+```
+data: {"type": "sources", "data": [
+  {"document": "14_Pricing_Sheet_2024.pdf", "page": 1, "relevance_score": 0.92}
+]}
+```
+
+4. **`conversation_id`** - Conversation identifier (sent after streaming completes)
+```
+data: {"type": "conversation_id", "data": "conv_abc123"}
+```
+
+5. **`done`** - Signals end of stream
+```
+data: {"type": "done"}
+```
+
+**Important Notes:**
+
+- Structured output parsing (evaluator flags, metadata extraction) runs **after** streaming completes to avoid breaking the stream
+- The frontend buffers tokens and displays them in real-time
+- Users can toggle between streaming and regular mode in the UI
+- Streaming provides better perceived performance for long responses
+
+**Error Handling:**
+- Errors are sent as SSE events with type `error`
+```
+data: {"type": "error", "message": "Rate limit exceeded"}
 ```
 
 ### Model Routing Rules
