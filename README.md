@@ -163,6 +163,7 @@ SUPABASE_KEY=your_supabase_anon_key
 # Server Configuration
 PORT=8000
 LOG_LEVEL=INFO
+CORS_ORIGINS=http://localhost:3000,http://localhost:3001,https://intelligent-rag.vercel.app
 ```
 
 **How to get API keys:**
@@ -740,67 +741,166 @@ To add new PDF documents to the knowledge base:
 
 Follow the [Setup Instructions](#setup-instructions) above. The API runs on `localhost:8000` by default.
 
-### Cloud Deployment
+### Production Deployment
 
-#### Backend Deployment (Railway/Render)
+This project is deployed with:
+- **Backend**: AWS EC2 (eu-north-1 region)
+- **Frontend**: Vercel
+- **Database**: Supabase (cloud-hosted)
+- **HTTPS**: Caddy reverse proxy with DuckDNS
 
-**Railway:**
-1. Create a new project on Railway
-2. Connect your GitHub repository
-3. Set environment variables in Railway dashboard:
-   - `GROQ_API_KEY`
-   - `HUGGINGFACE_API_KEY`
-   - `SUPABASE_URL`
-   - `SUPABASE_KEY`
-   - `PORT=8000`
-   - `LOG_LEVEL=INFO`
-   - `CORS_ORIGINS=http://localhost:3000,http://localhost:3001,https://intelligent-rag.vercel.app`
-4. Railway will automatically detect the Python app and deploy
+#### Backend Deployment (AWS EC2)
 
-**Render:**
-1. Create a new Web Service on Render
-2. Connect your GitHub repository
-3. Set build command: `cd backend && pip install -r requirements.txt`
-4. Set start command: `cd backend && python main.py`
-5. Add environment variables in Render dashboard
-6. Deploy
+**Live URL**: `https://clearpath-backend.duckdns.org`
+
+**Setup Steps:**
+
+1. **Launch EC2 Instance**
+   - Instance type: t2.micro or t3.micro (free tier)
+   - AMI: Ubuntu 22.04 LTS
+   - Region: eu-north-1 (Stockholm)
+   - Security Group: Allow ports 22 (SSH), 80 (HTTP), 443 (HTTPS), 8000 (backend)
+
+2. **SSH into Instance**
+   ```bash
+   chmod 400 clearpath-backend-key.pem
+   ssh -i clearpath-backend-key.pem ubuntu@<EC2_PUBLIC_IP>
+   ```
+
+3. **Install Dependencies**
+   ```bash
+   sudo apt update
+   sudo apt install -y python3-pip python3-venv git
+   ```
+
+4. **Clone Repository**
+   ```bash
+   cd /var/www
+   sudo mkdir clearpath-backend
+   sudo chown ubuntu:ubuntu clearpath-backend
+   git clone <repository-url> clearpath-backend
+   cd clearpath-backend/backend
+   ```
+
+5. **Set Up Python Environment**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+
+6. **Configure Environment Variables**
+   ```bash
+   nano .env
+   ```
+   Add your API keys and Supabase credentials (see [Setup Instructions](#setup-instructions))
+
+7. **Run Backend with nohup**
+   ```bash
+   nohup uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2 > server.log 2>&1 &
+   ```
+
+8. **Set Up HTTPS with Caddy + DuckDNS**
+   
+   a. Get free subdomain at https://www.duckdns.org
+   - Create subdomain (e.g., `clearpath-backend`)
+   - Point to your EC2 public IP
+   
+   b. Install Caddy:
+   ```bash
+   sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+   sudo apt update
+   sudo apt install caddy
+   ```
+   
+   c. Configure Caddy:
+   ```bash
+   sudo nano /etc/caddy/Caddyfile
+   ```
+   Add:
+   ```
+   clearpath-backend.duckdns.org {
+       reverse_proxy localhost:8000
+   }
+   ```
+   
+   d. Restart Caddy:
+   ```bash
+   sudo systemctl restart caddy
+   sudo systemctl status caddy
+   ```
+
+9. **Deploy Updates**
+   Create deployment script:
+   ```bash
+   nano ~/deploy.sh
+   ```
+   Add:
+   ```bash
+   #!/bin/bash
+   cd /var/www/clearpath-backend/backend
+   git pull origin main
+   source venv/bin/activate
+   pip install -r requirements.txt
+   pkill -9 uvicorn
+   nohup uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2 > server.log 2>&1 &
+   echo "Deployment complete!"
+   ```
+   Make executable:
+   ```bash
+   chmod +x ~/deploy.sh
+   ```
+
+**To update after pushing to GitHub:**
+```bash
+ssh -i clearpath-backend-key.pem ubuntu@<EC2_PUBLIC_IP>
+~/deploy.sh
+```
 
 #### Frontend Deployment (Vercel)
 
-1. Create a new project on Vercel
-2. Connect your GitHub repository
-3. Set root directory to `frontend/`
-4. Set environment variable:
-   - `NEXT_PUBLIC_API_URL=https://your-backend-url.com`
-5. Deploy
+**Live URL**: Your Vercel deployment URL
 
-#### AWS/GCP Deployment
+1. **Create Vercel Project**
+   - Go to https://vercel.com
+   - Import your GitHub repository
+   - Set root directory to `frontend/`
 
-**AWS Lambda + API Gateway:**
-- Package backend as Lambda function
-- Use Mangum adapter for FastAPI
-- Configure API Gateway for HTTP endpoints
-- Set environment variables in Lambda configuration
+2. **Configure Environment Variables**
+   - Go to Project Settings → Environment Variables
+   - Add:
+     ```
+     NEXT_PUBLIC_API_URL=https://clearpath-backend.duckdns.org
+     ```
+   - Enable for Production, Preview, and Development
 
-**GCP Cloud Run:**
-- Create Dockerfile for backend
-- Build and push to Google Container Registry
-- Deploy to Cloud Run
-- Set environment variables in Cloud Run configuration
+3. **Deploy**
+   - Vercel automatically deploys on git push
+   - Or manually trigger deployment from dashboard
 
-**Database:**
-- Supabase is cloud-hosted, no additional setup needed
-- Ensure firewall rules allow connections from deployment platform
+4. **Verify**
+   - Visit your Vercel URL
+   - Test chat functionality
+   - Check that API calls reach your EC2 backend
+
+#### Database (Supabase)
+
+- Supabase is cloud-hosted, no additional deployment needed
+- Ensure your EC2 instance can connect to Supabase
+- Connection details in `.env` file on EC2
 
 ### Environment Variables for Production
 
+**Backend (.env on EC2):**
 ```bash
 # Required
 GROQ_API_KEY=gsk_...
 HUGGINGFACE_API_KEY=hf_...
 SUPABASE_URL=https://...supabase.co
 SUPABASE_KEY=eyJ...
-CORS_ORIGINS=http://localhost:3000,http://localhost:3001,https://intelligent-rag.vercel.app
+
 # Optional
 PORT=8000
 LOG_LEVEL=INFO
@@ -808,6 +908,35 @@ MAX_CHUNKS=5
 CHUNK_SIZE=300
 CHUNK_OVERLAP=50
 ```
+
+**Frontend (Vercel Environment Variables):**
+```bash
+NEXT_PUBLIC_API_URL=https://clearpath-backend.duckdns.org
+```
+
+### Performance Optimization for EC2
+
+With limited resources (t2.micro: 1 vCPU, 1GB RAM), optimize performance:
+
+1. **Use 2 workers maximum**
+   ```bash
+   uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
+   ```
+
+2. **Add swap space**
+   ```bash
+   sudo fallocate -l 2G /swapfile
+   sudo chmod 600 /swapfile
+   sudo mkswap /swapfile
+   sudo swapon /swapfile
+   echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+   ```
+
+3. **Monitor resources**
+   ```bash
+   htop  # Install with: sudo apt install htop
+   free -h
+   ```
 
 ## Known Issues
 
