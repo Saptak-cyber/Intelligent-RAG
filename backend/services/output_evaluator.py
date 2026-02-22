@@ -43,7 +43,11 @@ class OutputEvaluator:
         "plan",
         "subscription",
         "payment",
-        "charge"
+        "charge",
+        "revenue",
+        "income",
+        "earnings",
+        "financial"
     ]
     
     # Phrases indicating conflicting or unclear documentation
