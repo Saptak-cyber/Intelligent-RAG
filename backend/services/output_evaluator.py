@@ -156,6 +156,43 @@ class OutputEvaluator:
         
         return True
     
+    # def _has_unverified_features(
+    #     self,
+    #     response: str,
+    #     sources: List[ScoredChunk]
+    # ) -> bool:
+    #     """
+    #     Detect when LLM mentions features/integrations not in retrieved chunks.
+        
+    #     This catches hallucinated features based on general SaaS knowledge.
+    #     Uses proper noun extraction to identify specific features mentioned.
+    #     """
+    #     # Extract proper nouns from response (capitalized terms, integration names)
+    #     response_proper_nouns = self._extract_proper_nouns(response)
+        
+    #     if not response_proper_nouns:
+    #         return False
+        
+    #     # Extract proper nouns from all retrieved chunks
+    #     chunks_text = " ".join([chunk.chunk.text for chunk in sources])
+    #     chunks_proper_nouns = self._extract_proper_nouns(chunks_text)
+        
+    #     # Check if response mentions proper nouns not in chunks
+    #     unverified_nouns = response_proper_nouns - chunks_proper_nouns
+        
+    #     # Filter out common words that might be capitalized but aren't features
+    #     # Note: These are now lowercase to match the updated extractor logic
+    #     stop_words = {
+    #         "the", "this", "that", "these", "those", "it", "they", "we", "you",
+    #         "a", "an", "and", "or", "but", "for"
+    #     }
+        
+    #     significant_unverified = {
+    #         noun for noun in unverified_nouns
+    #         if len(noun) > 2 and noun not in stop_words
+    #     }
+        
+    #     return len(significant_unverified) > 0
     def _has_unverified_features(
         self,
         response: str,
@@ -173,18 +210,20 @@ class OutputEvaluator:
         if not response_proper_nouns:
             return False
         
-        # Extract proper nouns from all retrieved chunks
-        chunks_text = " ".join([chunk.chunk.text for chunk in sources])
-        chunks_proper_nouns = self._extract_proper_nouns(chunks_text)
+        # Combine all chunk text and convert to lowercase for safe searching
+        chunks_text_lower = " ".join([chunk.chunk.text for chunk in sources]).lower()
         
-        # Check if response mentions proper nouns not in chunks
-        unverified_nouns = response_proper_nouns - chunks_proper_nouns
+        # Check if the extracted nouns exist ANYWHERE in the source chunks
+        unverified_nouns = set()
+        for noun in response_proper_nouns:
+            # Use regex boundaries to ensure we match whole words only
+            if not re.search(rf'\b{re.escape(noun)}\b', chunks_text_lower):
+                unverified_nouns.add(noun)
         
         # Filter out common words that might be capitalized but aren't features
-        # Note: These are now lowercase to match the updated extractor logic
         stop_words = {
             "the", "this", "that", "these", "those", "it", "they", "we", "you",
-            "a", "an", "and", "or", "but", "for"
+            "a", "an", "and", "or", "but", "for", "in", "on", "at", "to", "of", "with"
         }
         
         significant_unverified = {
@@ -226,9 +265,9 @@ class OutputEvaluator:
                 # Check previous word for sentence terminators or markdown markers
                 if i > 0:
                     prev_word = words[i-1].strip()
-                    # Matches punctuation endings OR markdown list markers (e.g., -, *, +, >, 1., 1))
+                    # Matches punctuation endings OR markdown list markers (e.g., -, *, +, >, •, 1., 1))
                     if (prev_word.endswith(('.', '!', '?', ':')) or 
-                        re.match(r'^(\d+[.)]|[-*+>])$', prev_word)):
+                        re.match(r'^(\d+[.)]|[-*+>•])$', prev_word)):
                         is_sentence_start = True
                 
                 # Add if it's mid-sentence

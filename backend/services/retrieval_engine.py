@@ -23,7 +23,7 @@ class RetrievalEngine:
         self.embedding_model = embedding_model
         logger.info("Initialized RetrievalEngine")
     
-    def retrieve(self, query: str, top_k: int = 5) -> List[ScoredChunk]:
+    def retrieve(self, query: str, top_k: int = 10) -> List[ScoredChunk]:
         """
         Retrieve relevant chunks for query with dynamic K-cutoff.
         
@@ -83,7 +83,7 @@ class RetrievalEngine:
             
             # Step 4: Apply dynamic K-cutoff (within 20% of top score)
             top_score = filtered_chunks[0].relevance_score
-            cutoff_threshold = top_score * 0.8  # 80% of top score
+            cutoff_threshold = top_score * 0.7  # 80% of top score
             
             dynamic_filtered_chunks = [
                 chunk for chunk in filtered_chunks
