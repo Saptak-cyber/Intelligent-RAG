@@ -304,7 +304,7 @@ class OutputEvaluator:
         """
         Detect pricing-related responses that express uncertainty or flag conflicting sources.
         
-        Condition: Response mentions pricing AND (uses hedging language OR explicitly mentions conflicts)
+        Condition: Response mentions pricing AND (uses hedging language OR explicitly mentions conflicts OR is a refusal)
         """
         response_lower = response.lower()
         
@@ -330,6 +330,11 @@ class OutputEvaluator:
         )
         
         if has_conflict:
+            return True
+        
+        # Check if this is a refusal to a pricing-related question
+        # This catches cases where the system can't find pricing/revenue information
+        if self._is_refusal(response):
             return True
         
         return False
