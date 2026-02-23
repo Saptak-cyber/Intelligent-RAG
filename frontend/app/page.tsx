@@ -35,7 +35,7 @@ export default function Home() {
   const [metadata, setMetadata] = useState<ResponseMetadata | null>(null)
   const [sources, setSources] = useState<Source[]>([])
   const [showDebug, setShowDebug] = useState(true)
-  const [useStreaming, setUseStreaming] = useState(true)
+  const [useStreaming, setUseStreaming] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const streamingMessageRef = useRef<HTMLDivElement>(null)
   

@@ -58,7 +58,7 @@ class LLMClient:
         self,
         model: str,
         prompt: str,
-        max_tokens: int = 500
+        max_tokens: int = 1024
     ) -> LLMResponse:
         """
         Generate response using Groq API.
@@ -89,7 +89,7 @@ class LLMClient:
                     }
                 ],
                 max_tokens=max_tokens,
-                temperature=0.2
+                temperature=0.3
             )
             
             # Calculate latency
@@ -247,10 +247,12 @@ class LLMClient:
 {context_section}{history_section}User question: {query}
 
 Instructions:
-- Answer based on the provided context
+- Answer based on the provided context from the documentation
+- Provide comprehensive, detailed answers that fully address the user's question
 - If the context doesn't contain relevant information, say so clearly
-- Be concise and helpful
-- Cite specific features or details from the documentation when applicable
+- Cite specific features, details, or examples from the documentation when applicable
+- Use clear formatting with bullet points or numbered lists when presenting multiple items
+- Be thorough but organized in your explanations
 
 Answer:"""
         
@@ -259,7 +261,7 @@ Answer:"""
         self,
         model: str,
         prompt: str,
-        max_tokens: int = 500
+        max_tokens: int = 1024
     ):
         """
         Generate streaming response using Groq API.
@@ -297,7 +299,7 @@ Answer:"""
                     }
                 ],
                 max_tokens=max_tokens,
-                temperature=0.2,
+                temperature=0.3,
                 stream=True
             )
 
