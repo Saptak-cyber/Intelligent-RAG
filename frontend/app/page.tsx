@@ -304,23 +304,26 @@ export default function Home() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col p-4 bg-gradient-to-b from-gray-50 to-gray-100">
+    <main className="flex min-h-screen flex-col p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       <div className="w-full max-w-7xl mx-auto flex gap-4 h-[calc(100vh-2rem)]">
         {/* Chat Interface */}
-        <div className="flex-1 bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
+        <div className="flex-1 bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
           {/* Header */}
-          <div className="bg-blue-600 text-white p-4 flex justify-between items-center flex-shrink-0">
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-5 flex justify-between items-center flex-shrink-0">
             <div>
-              <h1 className="text-2xl font-bold">ClearPath Support</h1>
-              <p className="text-sm text-blue-100">Ask me anything about ClearPath</p>
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                <span className="text-3xl">💬</span>
+                ClearPath Support
+              </h1>
+              <p className="text-sm text-blue-100 mt-1">Your intelligent assistant for all things ClearPath</p>
             </div>
             <div className="flex gap-2">
               <button
                 onClick={() => setUseStreaming(!useStreaming)}
-                className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all transform hover:scale-105 ${
                   useStreaming 
-                    ? 'bg-green-700 hover:bg-green-800' 
-                    : 'bg-blue-900 hover:bg-blue-800'
+                    ? 'bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/50' 
+                    : 'bg-slate-700 hover:bg-slate-600'
                 }`}
               >
                 {useStreaming ? '⚡ Streaming' : '📄 Regular'}
@@ -328,39 +331,50 @@ export default function Home() {
               {messages.length > 0 && (
                 <button
                   onClick={clearChat}
-                  className="px-4 py-2 bg-blue-900 hover:bg-red-800 rounded-lg text-sm transition-colors"
+                  className="px-4 py-2 bg-slate-700 hover:bg-red-600 rounded-lg text-sm font-medium transition-all transform hover:scale-105"
                 >
-                  Clear Chat
+                  🗑️ Clear
                 </button>
               )}
             </div>
           </div>
 
           {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
             {messages.length === 0 ? (
-              <div className="text-center text-gray-500 mt-20">
-                <p className="text-lg">Welcome to ClearPath Support!</p>
-                <p className="text-sm mt-2">Ask me anything about ClearPath features, pricing, or usage.</p>
+              <div className="text-center text-slate-400 mt-20">
+                <div className="text-6xl mb-4"></div>
+                <p className="text-xl font-semibold text-slate-300">Welcome to ClearPath Support!</p>
+                <p className="text-sm mt-3 text-slate-500">Ask me anything about ClearPath features, pricing, or usage.</p>
+                <div className="mt-8 grid grid-cols-1 gap-3 max-w-md mx-auto">
+                  {/* <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-3 text-left">
+                    <p className="text-xs text-slate-400">Try asking:</p>
+                    <p className="text-sm text-slate-300 mt-1">"What are the pricing plans?"</p>
+                  </div>
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-3 text-left">
+                    <p className="text-xs text-slate-400">Try asking:</p>
+                    <p className="text-sm text-slate-300 mt-1">"How do I integrate with Slack?"</p>
+                  </div> */}
+                </div>
               </div>
             ) : (
               messages.map((message, index) => (
                 <div
                   key={index}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-lg p-4 ${
+                    className={`max-w-[80%] rounded-2xl p-4 shadow-lg ${
                       message.role === 'user'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-900'
+                        ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white'
+                        : 'bg-slate-800/80 backdrop-blur-sm border border-slate-700 text-slate-100'
                     }`}
                   >
                     {message.role === 'user' ? (
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
                     ) : (
                       <div 
-                        className="prose prose-sm max-w-none prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1"
+                        className="prose prose-invert prose-sm max-w-none prose-headings:text-slate-200 prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2 prose-p:text-slate-300 prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-li:text-slate-300 prose-strong:text-slate-200 prose-code:text-blue-400 prose-code:bg-slate-900/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded"
                         ref={index === messages.length - 1 ? streamingMessageRef : null}
                       >
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -373,12 +387,12 @@ export default function Home() {
               ))
             )}
             {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-gray-100 rounded-lg p-4">
+              <div className="flex justify-start animate-fadeIn">
+                <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-2xl p-4 shadow-lg">
                   <div className="flex space-x-2">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-bounce"></div>
+                    <div className="w-2.5 h-2.5 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="w-2.5 h-2.5 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   </div>
                 </div>
               </div>
@@ -387,17 +401,17 @@ export default function Home() {
           </div>
 
           {/* Input Area */}
-          <div className="border-t border-gray-200 p-4 flex-shrink-0">
-            <form onSubmit={handleSubmit} className="flex space-x-2">
+          <div className="border-t border-slate-800 bg-slate-900/50 backdrop-blur-sm p-4 flex-shrink-0">
+            <form onSubmit={handleSubmit} className="flex space-x-3">
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Type your question... (Shift+Enter for new line)"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 resize-none"
+                className="flex-1 px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-100 placeholder-slate-500 resize-none transition-all"
                 disabled={isLoading}
                 rows={1}
-                style={{ minHeight: '42px', maxHeight: '120px' }}
+                style={{ minHeight: '48px', maxHeight: '120px' }}
                 onInput={(e) => {
                   const target = e.target as HTMLTextAreaElement
                   target.style.height = 'auto'
@@ -407,58 +421,65 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={isLoading || !input.trim()}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors self-end"
+                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 disabled:from-slate-700 disabled:to-slate-700 disabled:cursor-not-allowed transition-all transform hover:scale-105 disabled:transform-none shadow-lg disabled:shadow-none font-medium self-end"
               >
-                Send
+                {isLoading ? '⏳' : ''} Send
               </button>
             </form>
           </div>
         </div>
 
         {/* Debug Panel */}
-        <div className="w-96 bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
-          <div className="bg-gray-800 text-white p-4 flex justify-between items-center flex-shrink-0">
-            <h2 className="text-lg font-bold">Debug Panel</h2>
+        <div className="w-96 bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+          <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white p-4 flex justify-between items-center flex-shrink-0 border-b border-slate-700">
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <span>🔍</span> Debug Panel
+            </h2>
             <button
               onClick={() => setShowDebug(!showDebug)}
-              className="text-sm px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded"
+              className="text-sm px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors font-medium"
             >
-              {showDebug ? 'Hide' : 'Show'}
+              {showDebug ? '👁️ Hide' : '👁️ Show'}
             </button>
           </div>
 
           {showDebug && (
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
               {!metadata ? (
-                <div className="text-center text-gray-500 mt-20">
+                <div className="text-center text-slate-500 mt-20">
+                  <div className="text-4xl mb-3">📊</div>
                   <p className="text-sm">Send a message to see debug information</p>
                 </div>
               ) : (
                 <>
                   {/* Model Used */}
-                  <div className="border border-gray-200 rounded-lg p-3">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Model Used</h3>
-                    <p className="text-sm font-mono text-gray-900">{metadata.model_used}</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Classification: <span className="font-semibold">{metadata.classification}</span>
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 hover:border-slate-600 transition-colors">
+                    <h3 className="text-xs font-semibold text-slate-400 uppercase mb-2 flex items-center gap-1">
+                      <span>🤖</span> Model Used
+                    </h3>
+                    <p className="text-sm font-mono text-blue-400 bg-slate-900/50 px-2 py-1 rounded">{metadata.model_used}</p>
+                    <p className="text-xs text-slate-400 mt-2">
+                      Classification: <span className="font-semibold text-purple-400">{metadata.classification}</span>
                     </p>
                   </div>
 
                   {/* Token Usage */}
-                  <div className="border border-gray-200 rounded-lg p-3">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Token Usage</h3>
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 hover:border-slate-600 transition-colors">
+                    <h3 className="text-xs font-semibold text-slate-400 uppercase mb-2 flex items-center gap-1">
+                      <span>🎯</span> Token Usage
+                    </h3>
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Input:</span>
-                        <span className="text-sm font-semibold text-gray-900">{metadata.tokens.input}</span>
+                        <span className="text-sm text-slate-400">Input:</span>
+                        <span className="text-sm font-semibold text-emerald-400">{metadata.tokens.input}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Output:</span>
-                        <span className="text-sm font-semibold text-gray-900">{metadata.tokens.output}</span>
+                        <span className="text-sm text-slate-400">Output:</span>
+                        <span className="text-sm font-semibold text-blue-400">{metadata.tokens.output}</span>
                       </div>
-                      <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                        <span className="text-sm font-semibold text-gray-700">Total:</span>
-                        <span className="text-sm font-bold text-gray-900">
+                      <div className="flex justify-between items-center pt-2 border-t border-slate-700">
+                        <span className="text-sm font-semibold text-slate-300">Total:</span>
+                        <span className="text-sm font-bold text-purple-400">
                           {metadata.tokens.input + metadata.tokens.output}
                         </span>
                       </div>
@@ -466,21 +487,23 @@ export default function Home() {
                   </div>
 
                   {/* Evaluator Flags */}
-                  <div className="border border-gray-200 rounded-lg p-3">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Evaluator Flags</h3>
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 hover:border-slate-600 transition-colors">
+                    <h3 className="text-xs font-semibold text-slate-400 uppercase mb-2 flex items-center gap-1">
+                      <span>⚠️</span> Evaluator Flags
+                    </h3>
                     {metadata.evaluator_flags.length === 0 ? (
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span className="text-sm text-gray-600">No issues detected</span>
+                      <div className="flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-2">
+                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                        <span className="text-sm text-emerald-400 font-medium">No issues detected</span>
                       </div>
                     ) : (
                       <div className="space-y-2">
                         {metadata.evaluator_flags.map((flag, index) => (
-                          <div key={index} className="flex items-start space-x-2">
-                            <div className="w-2 h-2 bg-yellow-500 rounded-full mt-1.5"></div>
+                          <div key={index} className="flex items-start space-x-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2">
+                            <div className="w-2 h-2 bg-yellow-500 rounded-full mt-1.5 animate-pulse"></div>
                             <div className="flex-1">
-                              <p className="text-sm font-semibold text-gray-900">{flag}</p>
-                              <p className="text-xs text-gray-500">
+                              <p className="text-sm font-semibold text-yellow-400">{flag}</p>
+                              <p className="text-xs text-slate-400 mt-0.5">
                                 {getFlagDescription(flag)}
                               </p>
                             </div>
@@ -491,32 +514,36 @@ export default function Home() {
                   </div>
 
                   {/* Performance Metrics */}
-                  <div className="border border-gray-200 rounded-lg p-3">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Performance</h3>
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 hover:border-slate-600 transition-colors">
+                    <h3 className="text-xs font-semibold text-slate-400 uppercase mb-2 flex items-center gap-1">
+                      <span>⚡</span> Performance
+                    </h3>
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Latency:</span>
-                        <span className="text-sm font-semibold text-gray-900">{metadata.latency_ms}ms</span>
+                        <span className="text-sm text-slate-400">Latency:</span>
+                        <span className="text-sm font-semibold text-cyan-400">{metadata.latency_ms}ms</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Chunks Retrieved:</span>
-                        <span className="text-sm font-semibold text-gray-900">{metadata.chunks_retrieved}</span>
+                        <span className="text-sm text-slate-400">Chunks Retrieved:</span>
+                        <span className="text-sm font-semibold text-pink-400">{metadata.chunks_retrieved}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Sources */}
                   {sources.length > 0 && (
-                    <div className="border border-gray-200 rounded-lg p-3">
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Sources</h3>
+                    <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 hover:border-slate-600 transition-colors">
+                      <h3 className="text-xs font-semibold text-slate-400 uppercase mb-2 flex items-center gap-1">
+                        <span>📚</span> Sources
+                      </h3>
                       <div className="space-y-2">
                         {sources.map((source, index) => (
-                          <div key={index} className="text-sm">
-                            <p className="font-semibold text-gray-900">{source.document}</p>
-                            <div className="flex justify-between text-xs text-gray-500">
-                              {source.page && <span>Page {source.page}</span>}
+                          <div key={index} className="text-sm bg-slate-900/50 border border-slate-700 rounded-lg p-2">
+                            <p className="font-semibold text-slate-200 truncate">{source.document}</p>
+                            <div className="flex justify-between text-xs text-slate-400 mt-1">
+                              {source.page && <span>📄 Page {source.page}</span>}
                               {source.relevance_score && (
-                                <span>Score: {source.relevance_score.toFixed(3)}</span>
+                                <span className="text-blue-400">⭐ {source.relevance_score.toFixed(3)}</span>
                               )}
                             </div>
                           </div>

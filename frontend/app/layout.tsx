@@ -5,8 +5,8 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'ClearPath Chatbot',
-  description: 'Customer support chatbot for ClearPath project management tool',
+  title: 'ClearPath Support - AI Assistant',
+  description: 'Intelligent customer support chatbot for ClearPath project management tool',
 }
 
 export default function RootLayout({
