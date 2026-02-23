@@ -40,7 +40,7 @@ export default function Home() {
   const streamingMessageRef = useRef<HTMLDivElement>(null)
   
   // API URL from environment variable or default to localhost
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+  const API_URL = process.env.NEXT_PUBLIC_API_URL
 
   // Load chat history from localStorage on mount
   useEffect(() => {

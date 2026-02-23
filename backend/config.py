@@ -18,8 +18,7 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 # CORS Configuration
 CORS_ORIGINS = os.getenv(
-    "CORS_ORIGINS", 
-    "http://localhost:3000,http://localhost:3001"
+    "CORS_ORIGINS"
 ).split(",")
 
 # Model Configuration

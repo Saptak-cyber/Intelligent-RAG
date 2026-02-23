@@ -18,7 +18,11 @@ class OutputEvaluator:
         "i can't",
         "unable to find",
         "not available",
-        "doesn't mention"
+        "doesn't mention",
+        "does not contain",
+        "does not mention",
+        "do not have",
+        "does not have"
     ]
     
     # Hedging language for pricing uncertainty
@@ -137,7 +141,6 @@ class OutputEvaluator:
         response_lower = response.lower()
         
         # 1. Check for refusal phrases using regex word boundaries
-        # This prevents "I cannot" from matching inside larger words (if any existed)
         has_refusal = False
         for phrase in self.REFUSAL_PHRASES:
             if re.search(rf'\b{re.escape(phrase)}\b', response_lower):
@@ -147,17 +150,35 @@ class OutputEvaluator:
         if not has_refusal:
             return False
         
-        # 2. If a refusal phrase is found, check if it's a partial answer.
-        # Partial answers usually pivot with a contrast word to give the info they DO have.
+        # 2. Check if this is a partial answer vs complete refusal
+        # Partial answers provide actual information after the contrast word
         has_contrast = any(indicator in response_lower for indicator in self.PARTIAL_ANSWER_INDICATORS)
         
-        # 3. Pure refusals are typically very short ("I'm sorry, I don't know.").
-        # If the response has a contrast word AND is long enough to contain real info,
-        # we treat it as a successful partial answer, not a refusal.
-        word_count = len(response.split())
-        if has_contrast and word_count > 12:
-            return False
+        if has_contrast:
+            # Look for indicators that actual information is being provided
+            # These phrases suggest the LLM is answering with documentation content
+            provides_info_indicators = [
+                "does mention",
+                "is available",
+                "according to",
+                "the documentation",
+                "clearpath offers",
+                "clearpath provides",
+                "you can",
+                "it includes",
+                "features include",
+                "supports",
+                "allows you to"
+            ]
+            
+            provides_info = any(indicator in response_lower for indicator in provides_info_indicators)
+            
+            # If it provides actual info after the contrast, it's a partial answer
+            if provides_info:
+                return False
         
+        # 3. If no actual information is provided, it's a refusal
+        # (even if it offers suggestions like "try searching online")
         return True
     
     # def _has_unverified_features(

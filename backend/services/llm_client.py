@@ -89,7 +89,7 @@ class LLMClient:
                     }
                 ],
                 max_tokens=max_tokens,
-                temperature=0.7
+                temperature=0.2
             )
             
             # Calculate latency
@@ -297,7 +297,7 @@ Answer:"""
                     }
                 ],
                 max_tokens=max_tokens,
-                temperature=0.7,
+                temperature=0.2,
                 stream=True
             )
 
