@@ -111,6 +111,13 @@ except (ImportError, OSError):
 class OutputEvaluator:
     """Analyzes generated responses and flags quality issues."""
     
+    # Product names that should never be flagged as unverified
+    EXCLUDED_PRODUCT_NAMES = {
+        "clearpath",  # Your product name
+        "llama",      # LLM model name
+        "groq",       # LLM provider
+    }
+    
     # Refusal phrases to detect when LLM declines to answer
     REFUSAL_PHRASES = [
         "i don't have",
@@ -363,7 +370,7 @@ class OutputEvaluator:
             }
             significant_nouns = {
                 noun for noun in response_proper_nouns
-                if len(noun) > 2 and noun not in stop_words
+                if len(noun) > 2 and noun not in stop_words and noun not in self.EXCLUDED_PRODUCT_NAMES
             }
             return {
                 "has_unverified": len(significant_nouns) > 0,
@@ -402,6 +409,10 @@ class OutputEvaluator:
             
             # Skip if in stop words
             if noun in stop_words:
+                continue
+            
+            # Skip if it's an excluded product name (like "clearpath")
+            if noun in self.EXCLUDED_PRODUCT_NAMES:
                 continue
             
             # Skip if contains special characters (except spaces and hyphens)
