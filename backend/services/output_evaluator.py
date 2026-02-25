@@ -256,7 +256,8 @@ class OutputEvaluator:
         # Filter out common words that might be capitalized but aren't features
         stop_words = {
             "the", "this", "that", "these", "those", "it", "they", "we", "you",
-            "a", "an", "and", "or", "but", "for", "in", "on", "at", "to", "of", "with"
+            "a", "an", "and", "or", "but", "for", "in", "on", "at", "to", "of", "with",
+            "your", "my", "our", "their", "his", "her", "its","set", "up", "integrations", "youre", "go", "click", "search", "configure"
         }
         
         significant_unverified = {
@@ -274,8 +275,20 @@ class OutputEvaluator:
         Looks for:
         - Capitalized words (potential product names, features)
         - Integration names (e.g., "Slack", "GitHub")
+
+        Excludes common UI terms and generic capitalized words.
         """
         proper_nouns = set()
+
+        # Common UI/generic terms that shouldn't be flagged (lowercase for comparison)
+        ui_terms = {
+            'email', 'profile', 'settings', 'account', 'password', 'username',
+            'dashboard', 'menu', 'button', 'page', 'tab', 'field', 'form',
+            'update', 'save', 'cancel', 'delete', 'edit', 'view', 'create',
+            'address', 'name', 'phone', 'date', 'time', 'status', 'type',
+            'notes', 'description', 'title', 'message', 'notification',
+            'hours', 'days', 'weeks', 'months', 'years', 'new', 'old'
+        }
 
         # Pattern 1: Capitalized words (but not at sentence start)
         # Look for words that are capitalized in the middle of sentences
@@ -303,12 +316,18 @@ class OutputEvaluator:
                         re.match(r'^(\d+[.)]|[-*+>•])$', prev_word)):
                         is_sentence_start = True
 
-                # Add if it's mid-sentence
+                word_lower = clean_word.lower()
+
+                # Skip common UI terms
+                if word_lower in ui_terms:
+                    continue
+
+                # Add if it's mid-sentence and not a UI term
                 if not is_sentence_start:
-                    proper_nouns.add(clean_word.lower())
+                    proper_nouns.add(word_lower)
                 # Add if it's clearly a proper noun (all caps or camelCase) even at start of sentence
                 elif clean_word.isupper() or any(c.isupper() for c in clean_word[1:]):
-                    proper_nouns.add(clean_word.lower())
+                    proper_nouns.add(word_lower)
 
         # Pattern 2: Common integration/tool names (case-insensitive search, lowercase storage)
         # Removed overly generic terms like "api" to reduce false positives
