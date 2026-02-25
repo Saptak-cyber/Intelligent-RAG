@@ -12,6 +12,9 @@ HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
+# Supabase SSL Configuration (set to false to bypass SSL verification)
+SUPABASE_VERIFY_SSL = os.getenv("SUPABASE_VERIFY_SSL", "true").lower() == "true"
+
 # Server Configuration
 PORT = int(os.getenv("PORT", "8000"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

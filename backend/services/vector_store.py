@@ -1,10 +1,11 @@
 """Vector store implementation using Supabase pgvector."""
 import logging
+import httpx
 from typing import List, Optional
 from supabase import create_client, Client
 from models.chunk import Chunk, ScoredChunk
 from services.embedding_model import EmbeddingModel
-from config import SUPABASE_URL, SUPABASE_KEY
+from config import SUPABASE_URL, SUPABASE_KEY, SUPABASE_VERIFY_SSL
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +38,14 @@ class VectorStore:
         self.embedding_model = embedding_model
         self.table_name = table_name
         
-        # Initialize Supabase client
-        self.client: Client = create_client(supabase_url, supabase_key)
+        # Initialize Supabase client with SSL configuration
+        if not SUPABASE_VERIFY_SSL:
+            logger.warning("⚠️  SSL verification DISABLED for Supabase VectorStore")
+            http_client = httpx.Client(verify=False)
+            self.client: Client = create_client(supabase_url, supabase_key)
+            self.client.postgrest.session = http_client
+        else:
+            self.client: Client = create_client(supabase_url, supabase_key)
         
         logger.info(f"Initialized VectorStore with table: {table_name}")
     

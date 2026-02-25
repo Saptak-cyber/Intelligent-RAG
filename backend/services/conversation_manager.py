@@ -1,12 +1,13 @@
 """Conversation manager for multi-turn conversation support."""
 import logging
 import uuid
+import httpx
 from datetime import datetime
 from typing import Optional, List
 from supabase import create_client, Client
 
 from models.conversation import Conversation, Turn
-from config import SUPABASE_URL, SUPABASE_KEY
+from config import SUPABASE_URL, SUPABASE_KEY, SUPABASE_VERIFY_SSL
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,17 @@ class ConversationManager:
         if not SUPABASE_URL or not SUPABASE_KEY:
             raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set in environment variables")
         
-        self.client: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        # Configure SSL verification
+        if not SUPABASE_VERIFY_SSL:
+            logger.warning("⚠️  SSL verification DISABLED for Supabase (INSECURE - only for development)")
+            # Create httpx client with SSL disabled
+            http_client = httpx.Client(verify=False)
+            self.client: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+            # Override the session
+            self.client.postgrest.session = http_client
+        else:
+            self.client: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        
         logger.info("ConversationManager initialized with Supabase")
     
     def get_or_create_conversation(self, conversation_id: Optional[str] = None) -> Conversation:
