@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { marked } from 'marked'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -188,10 +189,11 @@ export default function Home() {
                 accumulatedText += data.content
                 console.log('Received token:', data.content, 'Total length:', accumulatedText.length)
                 
-                // Update DOM directly for immediate visual feedback
+                // Update DOM directly for immediate visual feedback with markdown rendering
                 if (streamingMessageRef.current) {
-                  streamingMessageRef.current.textContent = accumulatedText
-                  console.log('Updated DOM ref')
+                  // Convert markdown to HTML and set it
+                  streamingMessageRef.current.innerHTML = marked(accumulatedText) as string
+                  console.log('Updated DOM ref with markdown')
                   // Force browser to paint the update
                   await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
                 } else {
