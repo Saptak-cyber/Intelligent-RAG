@@ -61,15 +61,26 @@ Flag: ✗ (provides useful information despite initial disclaimer)
 **Purpose:** Detects when the LLM mentions specific features, integrations, or proper nouns that don't appear in the retrieved documentation chunks.
 
 **How it works:**
-- Extracts proper nouns from both the response and retrieved chunks
-- Compares them to find mentions in the response that aren't in the source material
+- Uses **spaCy NER (Named Entity Recognition)** for accurate proper noun detection
+- Extracts named entities from both response and retrieved chunks:
+  - **ORG**: Organizations, companies (e.g., "Slack", "GitHub", "Microsoft")
+  - **PRODUCT**: Products, services (e.g., "ClearPath", "Office 365")
+  - **GPE**: Geopolitical entities (e.g., "Paris", "France")
+- Also includes integration patterns for comprehensive coverage
+- Compares entities to find mentions in response not in source material
 - Uses case-insensitive matching with word boundaries
-- Filters out common stop words and short terms
+- Filters out common stop words
+
+**Why spaCy?**
+- **Accurate**: Distinguishes between proper nouns ("Slack") and common words ("Set", "Go", "Click")
+- **Context-aware**: Understands "Slack" is an organization, not just a capitalized word
+- **No manual maintenance**: Automatically filters false positives without manual stop word lists
+- **Fallback available**: Works without spaCy using simpler extraction (less accurate)
 
 **Proper noun extraction includes:**
-- Capitalized words mid-sentence (e.g., "Slack", "GitHub")
-- Integration/tool names (e.g., "OAuth", "SAML", "API")
-- Product names and features
+- Named entities detected by spaCy (ORG, PRODUCT, GPE)
+- Integration/tool names via patterns (e.g., "OAuth", "SAML", "Jira", "Docker")
+- Product names and company names
 
 **Example scenario:**
 ```
@@ -78,6 +89,24 @@ Retrieved Chunks: Mention "Slack" and "Google Calendar"
 Response: "ClearPath integrates with Slack, Google Calendar, and Jira."
 Flag: ✓ unverified_feature (Jira wasn't in the documentation)
 ```
+
+**False positive prevention:**
+```
+Response: "How to Set Up Slack Integration
+1. Go to Settings
+2. Click on Integrations"
+
+Without spaCy: Extracts "Set", "Go", "Click", "Integrations" → False positives
+With spaCy: Only extracts "Slack" → Accurate detection
+```
+
+**Setup:**
+```bash
+pip install spacy
+python -m spacy download en_core_web_sm
+```
+
+See `SPACY_SETUP.md` for detailed installation instructions.
 
 **Why it matters:** Catches hallucinated features where the LLM uses general SaaS knowledge to invent capabilities not documented in the actual product docs.
 

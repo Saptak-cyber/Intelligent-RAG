@@ -3,6 +3,15 @@ import re
 from typing import List, Set
 from models.chunk import ScoredChunk
 
+try:
+    import spacy
+    # Load small English model for named entity recognition
+    nlp = spacy.load("en_core_web_sm")
+    SPACY_AVAILABLE = True
+except (ImportError, OSError):
+    SPACY_AVAILABLE = False
+    nlp = None
+
 
 class OutputEvaluator:
     """Analyzes generated responses and flags quality issues."""
@@ -269,78 +278,66 @@ class OutputEvaluator:
     
     def _extract_proper_nouns(self, text: str) -> Set[str]:
         """
-        Extract proper nouns from text using regex patterns, handling Markdown
-        and normalizing casing to prevent false positives.
+        Extract proper nouns from text using spaCy NER for accurate detection.
+        Falls back to pattern matching if spaCy is unavailable.
 
-        Looks for:
-        - Capitalized words (potential product names, features)
-        - Integration names (e.g., "Slack", "GitHub")
-
-        Excludes common UI terms and generic capitalized words.
+        Uses spaCy to identify:
+        - ORG: Organizations, companies, agencies (e.g., "Slack", "GitHub")
+        - PRODUCT: Products, services (e.g., "ClearPath")
+        - GPE: Geopolitical entities (e.g., "Paris", "France")
+        
+        Also includes integration patterns for comprehensive coverage.
         """
         proper_nouns = set()
 
-        # Common UI/generic terms that shouldn't be flagged (lowercase for comparison)
-        ui_terms = {
-            'email', 'profile', 'settings', 'account', 'password', 'username',
-            'dashboard', 'menu', 'button', 'page', 'tab', 'field', 'form',
-            'update', 'save', 'cancel', 'delete', 'edit', 'view', 'create',
-            'address', 'name', 'phone', 'date', 'time', 'status', 'type',
-            'notes', 'description', 'title', 'message', 'notification',
-            'hours', 'days', 'weeks', 'months', 'years', 'new', 'old'
-        }
-
-        # Pattern 1: Capitalized words (but not at sentence start)
-        # Look for words that are capitalized in the middle of sentences
-        words = text.split()
-        for i, word in enumerate(words):
-            # Strip possessives first to avoid "ClearPath's" becoming "ClearPaths"
-            word = word.replace("'s", "").replace("\u2019s", "")
-
-            # Clean remaining punctuation
-            clean_word = re.sub(r'[^\w\s-]', '', word)
-
-            # Skip if empty after cleaning
-            if not clean_word:
-                continue
-
-            # Check if word is capitalized
-            if clean_word[0].isupper():
-                is_sentence_start = (i == 0)
-
-                # Check previous word for sentence terminators or markdown markers
-                if i > 0:
-                    prev_word = words[i-1].strip()
-                    # Matches punctuation endings OR markdown list markers (e.g., -, *, +, >, •, 1., 1))
-                    if (prev_word.endswith(('.', '!', '?', ':')) or 
-                        re.match(r'^(\d+[.)]|[-*+>•])$', prev_word)):
-                        is_sentence_start = True
-
-                word_lower = clean_word.lower()
-
-                # Skip common UI terms
-                if word_lower in ui_terms:
+        if SPACY_AVAILABLE:
+            # Use spaCy for accurate named entity recognition
+            doc = nlp(text)
+            
+            # Extract named entities
+            for ent in doc.ents:
+                # Focus on organizations, products, and locations
+                if ent.label_ in ["ORG", "PRODUCT", "GPE"]:
+                    proper_nouns.add(ent.text.lower())
+        else:
+            # Fallback: Simple capitalized word extraction
+            # This is less accurate but works without spaCy
+            words = text.split()
+            for i, word in enumerate(words):
+                clean_word = re.sub(r'[^\w\s-]', '', word.replace("'s", "").replace("\u2019s", ""))
+                
+                if not clean_word or not clean_word[0].isupper():
                     continue
+                
+                # Only add if clearly a proper noun (CamelCase or all caps)
+                if clean_word.isupper() or any(c.isupper() for c in clean_word[1:]):
+                    proper_nouns.add(clean_word.lower())
 
-                # Add if it's mid-sentence and not a UI term
-                if not is_sentence_start:
-                    proper_nouns.add(word_lower)
-                # Add if it's clearly a proper noun (all caps or camelCase) even at start of sentence
-                elif clean_word.isupper() or any(c.isupper() for c in clean_word[1:]):
-                    proper_nouns.add(word_lower)
-
-        # Pattern 2: Common integration/tool names (case-insensitive search, lowercase storage)
-        # Removed overly generic terms like "api" to reduce false positives
+        # Always include integration patterns for comprehensive coverage
         integration_patterns = [
-            r'\b(slack|github|jira|trello|asana|monday|notion|confluence)\b',
-            r'\b(google\s+\w+|microsoft\s+\w+|salesforce)\b',  # Require context
-            r'\b(rest\s+api|graphql|oauth|sso|saml)\b'  # More specific API terms
+            # Collaboration & Project Management
+            r'\b(slack|github|jira|trello|asana|monday|notion|confluence|basecamp|clickup)\b',
+            # Major Platforms
+            r'\b(google\s+\w+|microsoft\s+\w+|salesforce|adobe\s+\w+)\b',
+            # DevOps & Infrastructure
+            r'\b(aws|azure|docker|kubernetes|gitlab|bitbucket|jenkins|circleci|heroku|vercel|netlify)\b',
+            # Monitoring & Analytics
+            r'\b(datadog|sentry|pagerduty|splunk|new\s+relic|grafana|prometheus)\b',
+            # Communication & Support
+            r'\b(zoom|teams|zendesk|intercom|freshdesk|hubspot)\b',
+            # Design & Content
+            r'\b(figma|sketch|miro|canva|airtable)\b',
+            # Payment & Finance
+            r'\b(stripe|paypal|square|quickbooks)\b',
+            # Storage & File Sharing
+            r'\b(dropbox|box|onedrive|s3)\b',
+            # API & Auth protocols
+            r'\b(rest\s+api|graphql|oauth|sso|saml|jwt|api\s+key)\b'
         ]
 
         for pattern in integration_patterns:
             matches = re.finditer(pattern, text, re.IGNORECASE)
             for match in matches:
-                # Store as lowercase to ensure case-insensitive set difference
                 proper_nouns.add(match.group(0).lower())
 
         return proper_nouns
