@@ -5,8 +5,103 @@ from models.chunk import ScoredChunk
 
 try:
     import spacy
+    from spacy.pipeline import EntityRuler
+    
     # Load small English model for named entity recognition
     nlp = spacy.load("en_core_web_sm")
+    
+    # Add custom entity ruler for integration/tech terms
+    # This ensures spaCy recognizes these terms regardless of capitalization
+    if "entity_ruler" not in nlp.pipe_names:
+        ruler = nlp.add_pipe("entity_ruler", before="ner")
+        
+        # Define patterns for common integrations and tech terms
+        patterns = [
+            # Collaboration & Project Management
+            {"label": "ORG", "pattern": [{"LOWER": "slack"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "github"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "jira"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "trello"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "asana"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "monday"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "notion"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "confluence"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "basecamp"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "clickup"}]},
+            
+            # Major Platforms
+            {"label": "ORG", "pattern": [{"LOWER": "microsoft"}, {"LOWER": "teams"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "google"}, {"LOWER": "drive"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "google"}, {"LOWER": "workspace"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "salesforce"}]},
+            
+            # DevOps & Infrastructure
+            {"label": "ORG", "pattern": [{"LOWER": "aws"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "azure"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "docker"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "kubernetes"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "gitlab"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "bitbucket"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "jenkins"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "circleci"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "heroku"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "vercel"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "netlify"}]},
+            
+            # Monitoring & Analytics
+            {"label": "ORG", "pattern": [{"LOWER": "datadog"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "sentry"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "pagerduty"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "splunk"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "grafana"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "prometheus"}]},
+            
+            # Communication & Support
+            {"label": "ORG", "pattern": [{"LOWER": "zoom"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "teams"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "zendesk"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "intercom"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "freshdesk"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "hubspot"}]},
+            
+            # Design & Content
+            {"label": "ORG", "pattern": [{"LOWER": "figma"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "sketch"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "miro"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "canva"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "airtable"}]},
+            
+            # Payment & Finance
+            {"label": "ORG", "pattern": [{"LOWER": "stripe"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "paypal"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "square"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "quickbooks"}]},
+            
+            # Storage & File Sharing
+            {"label": "ORG", "pattern": [{"LOWER": "dropbox"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "box"}]},
+            {"label": "ORG", "pattern": [{"LOWER": "onedrive"}]},
+            {"label": "PRODUCT", "pattern": [{"LOWER": "s3"}]},  # Lowercase s3
+            {"label": "PRODUCT", "pattern": "S3"},  # Uppercase S3
+            
+            # API & Auth protocols (as PRODUCT since they're technical terms)
+            {"label": "PRODUCT", "pattern": [{"LOWER": "rest"}, {"LOWER": "api"}]},
+            {"label": "PRODUCT", "pattern": [{"LOWER": "api"}]},  # Standalone api
+            {"label": "PRODUCT", "pattern": "API"},  # Uppercase API
+            {"label": "PRODUCT", "pattern": [{"LOWER": "graphql"}]},
+            {"label": "PRODUCT", "pattern": [{"LOWER": "oauth"}]},
+            {"label": "PRODUCT", "pattern": "OAuth"},  # Mixed case OAuth
+            {"label": "PRODUCT", "pattern": [{"LOWER": "sso"}]},
+            {"label": "PRODUCT", "pattern": "SSO"},  # Uppercase SSO
+            {"label": "PRODUCT", "pattern": [{"LOWER": "saml"}]},
+            {"label": "PRODUCT", "pattern": [{"LOWER": "jwt"}]},
+            {"label": "PRODUCT", "pattern": "JWT"},  # Uppercase JWT
+            {"label": "PRODUCT", "pattern": [{"LOWER": "api"}, {"LOWER": "key"}]},
+            {"label": "PRODUCT", "pattern": [{"LOWER": "api"}, {"LOWER": "keys"}]},
+        ]
+        
+        ruler.add_patterns(patterns)
+    
     SPACY_AVAILABLE = True
 except (ImportError, OSError):
     SPACY_AVAILABLE = False
@@ -329,15 +424,15 @@ class OutputEvaluator:
     
     def _extract_proper_nouns(self, text: str) -> Set[str]:
         """
-        Extract proper nouns from text using spaCy NER for accurate detection.
+        Extract proper nouns from text using spaCy NER with custom entity patterns.
         Falls back to pattern matching if spaCy is unavailable.
 
         Uses spaCy to identify:
         - ORG: Organizations, companies, agencies (e.g., "Slack", "GitHub")
-        - PRODUCT: Products, services (e.g., "ClearPath")
+        - PRODUCT: Products, services (e.g., "ClearPath", "OAuth", "JWT")
         - GPE: Geopolitical entities (e.g., "Paris", "France")
         
-        Also includes integration patterns for comprehensive coverage.
+        With EntityRuler, spaCy now recognizes integrations/tech terms regardless of case.
         """
         proper_nouns = set()
 
@@ -364,17 +459,46 @@ class OutputEvaluator:
                     stop_words = {'the', 'a', 'an', 'this', 'that', 'these', 'those'}
                     
                     for word in words:
-                        # Skip stop words and short words
-                        if word in stop_words or len(word) <= 2:
+                        # Skip stop words but keep 2-letter acronyms (like s3, ec2)
+                        if word in stop_words:
+                            continue
+                        if len(word) < 2:  # Only skip single letters
                             continue
                         
                         # Add individual word as proper noun
                         proper_nouns.add(word)
         else:
-            # Fallback: Simple capitalized word extraction
-            # This is less accurate but works without spaCy
+            # Fallback: Pattern matching when spaCy is unavailable
+            # This is less accurate but ensures basic functionality
+            integration_patterns = [
+                # Collaboration & Project Management
+                r'\b(slack|github|jira|trello|asana|monday|notion|confluence|basecamp|clickup)\b',
+                # Major Platforms
+                r'\b(google\s+\w+|microsoft\s+\w+|salesforce|adobe\s+\w+)\b',
+                # DevOps & Infrastructure
+                r'\b(aws|azure|docker|kubernetes|gitlab|bitbucket|jenkins|circleci|heroku|vercel|netlify)\b',
+                # Monitoring & Analytics
+                r'\b(datadog|sentry|pagerduty|splunk|new\s+relic|grafana|prometheus)\b',
+                # Communication & Support
+                r'\b(zoom|teams|zendesk|intercom|freshdesk|hubspot)\b',
+                # Design & Content
+                r'\b(figma|sketch|miro|canva|airtable)\b',
+                # Payment & Finance
+                r'\b(stripe|paypal|square|quickbooks)\b',
+                # Storage & File Sharing
+                r'\b(dropbox|box|onedrive|s3)\b',
+                # API & Auth protocols
+                r'\b(rest\s+api|graphql|oauth|sso|saml|jwt|api\s+key)\b'
+            ]
+
+            for pattern in integration_patterns:
+                matches = re.finditer(pattern, text, re.IGNORECASE)
+                for match in matches:
+                    proper_nouns.add(match.group(0).lower())
+            
+            # Also try simple capitalized word extraction
             words = text.split()
-            for i, word in enumerate(words):
+            for word in words:
                 clean_word = re.sub(r'[^\w\s-]', '', word.replace("'s", "").replace("\u2019s", ""))
                 
                 if not clean_word or not clean_word[0].isupper():
@@ -383,33 +507,6 @@ class OutputEvaluator:
                 # Only add if clearly a proper noun (CamelCase or all caps)
                 if clean_word.isupper() or any(c.isupper() for c in clean_word[1:]):
                     proper_nouns.add(clean_word.lower())
-
-        # Always include integration patterns for comprehensive coverage
-        integration_patterns = [
-            # Collaboration & Project Management
-            r'\b(slack|github|jira|trello|asana|monday|notion|confluence|basecamp|clickup)\b',
-            # Major Platforms
-            r'\b(google\s+\w+|microsoft\s+\w+|salesforce|adobe\s+\w+)\b',
-            # DevOps & Infrastructure
-            r'\b(aws|azure|docker|kubernetes|gitlab|bitbucket|jenkins|circleci|heroku|vercel|netlify)\b',
-            # Monitoring & Analytics
-            r'\b(datadog|sentry|pagerduty|splunk|new\s+relic|grafana|prometheus)\b',
-            # Communication & Support
-            r'\b(zoom|teams|zendesk|intercom|freshdesk|hubspot)\b',
-            # Design & Content
-            r'\b(figma|sketch|miro|canva|airtable)\b',
-            # Payment & Finance
-            r'\b(stripe|paypal|square|quickbooks)\b',
-            # Storage & File Sharing
-            r'\b(dropbox|box|onedrive|s3)\b',
-            # API & Auth protocols
-            r'\b(rest\s+api|graphql|oauth|sso|saml|jwt|api\s+key)\b'
-        ]
-
-        for pattern in integration_patterns:
-            matches = re.finditer(pattern, text, re.IGNORECASE)
-            for match in matches:
-                proper_nouns.add(match.group(0).lower())
 
         return proper_nouns
     
