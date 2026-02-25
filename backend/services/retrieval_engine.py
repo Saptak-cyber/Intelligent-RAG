@@ -67,7 +67,7 @@ class RetrievalEngine:
                 return []
             
             # Step 3: Apply relevance threshold (score > 0.3)
-            relevance_threshold = 0.2
+            relevance_threshold = 0.25
             filtered_chunks = [
                 chunk for chunk in scored_chunks
                 if chunk.relevance_score > relevance_threshold

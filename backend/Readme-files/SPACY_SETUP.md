@@ -123,3 +123,56 @@ This ensures the system works even without spaCy, but with reduced accuracy.
 - Load time: ~100ms (cached after first load)
 - Processing time: ~5-10ms per response
 - Minimal impact on overall latency
+
+
+## How It Works
+
+### Multi-Word Entity Splitting
+
+spaCy often extracts multi-word phrases as single entities (e.g., "the Slack integration"). To prevent false positives, we split these into individual words:
+
+**Before (problematic):**
+```python
+spaCy extracts: "the Slack integration"
+Stored as: {"the slack integration"}
+Result: False positive if exact phrase not in chunks
+```
+
+**After (fixed):**
+```python
+spaCy extracts: "the Slack integration"
+Split into: ["the", "Slack", "integration"]
+Filter stop words: ["Slack", "integration"]
+Stored as: {"slack", "integration"}
+Result: Accurate matching against individual words in chunks
+```
+
+### Filtering Logic
+
+1. **Extract entities** - spaCy identifies ORG, PRODUCT, GPE entities
+2. **Clean text** - Remove special characters, convert to lowercase
+3. **Split words** - Break multi-word entities into individual words
+4. **Filter stop words** - Remove "the", "a", "an", etc.
+5. **Validate** - Skip words shorter than 3 characters
+
+This ensures only meaningful proper nouns are flagged as unverified.
+
+### Example
+
+**Input text:**
+```
+"ClearPath integrates with the Slack integration and GitHub API"
+```
+
+**spaCy extracts:**
+- "ClearPath" (ORG)
+- "the Slack integration" (ORG)
+- "GitHub API" (ORG)
+
+**After splitting and filtering:**
+```python
+{"clearpath", "slack", "integration", "github", "api"}
+```
+
+**Verification:**
+Each word is checked individually against chunks, preventing false positives from multi-word phrases.

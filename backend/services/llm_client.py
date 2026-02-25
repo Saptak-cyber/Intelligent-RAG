@@ -248,8 +248,8 @@ class LLMClient:
 
 Instructions:
 - Answer based on the provided context from the documentation
-- Provide comprehensive, detailed answers that fully address the user's question
-- If the context doesn't contain relevant information, say so clearly
+- Provide answers that fully address the user's question
+- If the context doesn't contain relevant information, say so clearly and ask for follow up
 - Cite specific features, details, or examples from the documentation when applicable
 - Use clear formatting with bullet points or numbered lists when presenting multiple items
 - Be thorough but organized in your explanations

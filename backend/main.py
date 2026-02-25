@@ -172,7 +172,7 @@ async def query_endpoint(request: QueryRequest) -> QueryResponse:
         )
         
         # Step 8: Evaluate response using OutputEvaluator
-        evaluator_flags = output_evaluator.evaluate(
+        evaluator_flags, evaluator_details = output_evaluator.evaluate(
             response=llm_response.text,
             chunks_retrieved=chunks_retrieved,
             sources=retrieved_chunks
@@ -216,6 +216,15 @@ async def query_endpoint(request: QueryRequest) -> QueryResponse:
         total_latency_ms = int((time.time() - start_time) * 1000)
         
         # Step 14: Build and return response
+        from models.api import EvaluatorFlagDetail
+        
+        # Convert evaluator details to API format
+        evaluator_details_list = []
+        for flag_name, details in evaluator_details.items():
+            evaluator_details_list.append(
+                EvaluatorFlagDetail(flag=flag_name, details=details)
+            )
+        
         response = QueryResponse(
             answer=llm_response.text,
             metadata=ResponseMetadata(
@@ -227,7 +236,8 @@ async def query_endpoint(request: QueryRequest) -> QueryResponse:
                 ),
                 latency_ms=total_latency_ms,
                 chunks_retrieved=chunks_retrieved,
-                evaluator_flags=evaluator_flags
+                evaluator_flags=evaluator_flags,
+                evaluator_details=evaluator_details_list if evaluator_details_list else None
             ),
             sources=sources,
             conversation_id=conversation_id
@@ -378,7 +388,7 @@ async def query_stream_endpoint(request: QueryRequest):
                     llm_metadata = chunk["data"]
 
             # Step 8: Evaluate response using OutputEvaluator
-            evaluator_flags = output_evaluator.evaluate(
+            evaluator_flags, evaluator_details = output_evaluator.evaluate(
                 response=accumulated_text,
                 chunks_retrieved=chunks_retrieved,
                 sources=retrieved_chunks

@@ -22,6 +22,15 @@ interface ResponseMetadata {
   latency_ms: number
   chunks_retrieved: number
   evaluator_flags: string[]
+  evaluator_details?: Array<{
+    flag: string
+    details: {
+      unverified_nouns?: string[]
+      response_nouns?: string[]
+      chunks_nouns?: string[]
+      spacy_available?: boolean
+    }
+  }>
 }
 
 interface Source {
@@ -500,17 +509,46 @@ export default function Home() {
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {metadata.evaluator_flags.map((flag, index) => (
-                          <div key={index} className="flex items-start space-x-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2">
-                            <div className="w-2 h-2 bg-yellow-500 rounded-full mt-1.5 animate-pulse"></div>
-                            <div className="flex-1">
-                              <p className="text-sm font-semibold text-yellow-400">{flag}</p>
-                              <p className="text-xs text-slate-400 mt-0.5">
-                                {getFlagDescription(flag)}
-                              </p>
+                        {metadata.evaluator_flags.map((flag, index) => {
+                          // Find details for this flag
+                          const flagDetails = metadata.evaluator_details?.find(d => d.flag === flag)
+                          
+                          return (
+                            <div key={index} className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2">
+                              <div className="flex items-start space-x-2">
+                                <div className="w-2 h-2 bg-yellow-500 rounded-full mt-1.5 animate-pulse"></div>
+                                <div className="flex-1">
+                                  <p className="text-sm font-semibold text-yellow-400">{flag}</p>
+                                  <p className="text-xs text-slate-400 mt-0.5">
+                                    {getFlagDescription(flag)}
+                                  </p>
+                                  
+                                  {/* Show unverified nouns if available */}
+                                  {flag === 'unverified_feature' && flagDetails?.details?.unverified_nouns && (
+                                    <div className="mt-2 pt-2 border-t border-yellow-500/20">
+                                      <p className="text-xs font-semibold text-yellow-300 mb-1">Unverified terms:</p>
+                                      <div className="flex flex-wrap gap-1">
+                                        {flagDetails.details.unverified_nouns.map((noun, i) => (
+                                          <span 
+                                            key={i}
+                                            className="inline-block px-2 py-0.5 bg-yellow-500/20 border border-yellow-500/40 rounded text-xs text-yellow-200"
+                                          >
+                                            {noun}
+                                          </span>
+                                        ))}
+                                      </div>
+                                      {flagDetails.details.spacy_available !== undefined && (
+                                        <p className="text-xs text-slate-500 mt-1">
+                                          {flagDetails.details.spacy_available ? '✓ Using spaCy NER' : '⚠ Fallback mode (install spaCy)'}
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     )}
                   </div>

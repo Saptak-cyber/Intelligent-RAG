@@ -95,9 +95,9 @@ class OutputEvaluator:
         response: str,
         chunks_retrieved: int,
         sources: List[ScoredChunk]
-    ) -> List[str]:
+    ) -> tuple[List[str], dict]:
         """
-        Evaluate response quality and return flags.
+        Evaluate response quality and return flags with details.
         
         Args:
             response: Generated LLM response
@@ -105,9 +105,10 @@ class OutputEvaluator:
             sources: Retrieved chunks with metadata
             
         Returns:
-            List of flag strings (empty if no issues)
+            Tuple of (flags list, details dict) where details contains additional info
         """
         flags = []
+        details = {}
         
         # Check 1: No-context detection
         if self._is_no_context(response, chunks_retrieved):
@@ -118,14 +119,21 @@ class OutputEvaluator:
             flags.append("refusal")
         
         # Check 3: Groundedness check (unverified features)
-        if self._has_unverified_features(response, sources):
+        unverified_result = self._has_unverified_features(response, sources)
+        if unverified_result["has_unverified"]:
             flags.append("unverified_feature")
+            details["unverified_feature"] = {
+                "unverified_nouns": sorted(unverified_result["unverified_nouns"]),
+                "response_nouns": sorted(unverified_result["response_nouns"]),
+                "chunks_nouns": sorted(unverified_result["chunks_nouns"]),
+                "spacy_available": SPACY_AVAILABLE
+            }
         
         # Check 4: Pricing uncertainty detection
         if self._has_pricing_uncertainty(response, sources):
             flags.append("pricing_uncertainty")
         
-        return flags
+        return flags, details
     
     def _is_no_context(self, response: str, chunks_retrieved: int) -> bool:
         """
@@ -226,19 +234,31 @@ class OutputEvaluator:
         self,
         response: str,
         sources: List[ScoredChunk]
-    ) -> bool:
+    ) -> dict:
         """
         Detect when LLM mentions features/integrations not in retrieved chunks.
-        
+
         This catches hallucinated features based on general SaaS knowledge.
         Uses proper noun extraction to identify specific features mentioned.
+
+        Returns:
+            Dict with:
+                - has_unverified: bool
+                - unverified_nouns: set of unverified nouns
+                - response_nouns: set of all nouns in response
+                - chunks_nouns: set of all nouns in chunks
         """
         # Extract proper nouns from response (capitalized terms, integration names)
         response_proper_nouns = self._extract_proper_nouns(response)
-        
+
         if not response_proper_nouns:
-            return False
-        
+            return {
+                "has_unverified": False,
+                "unverified_nouns": set(),
+                "response_nouns": set(),
+                "chunks_nouns": set()
+            }
+
         # Handle empty sources list
         if not sources:
             # If no sources but response has proper nouns, they're unverified
@@ -250,31 +270,62 @@ class OutputEvaluator:
                 noun for noun in response_proper_nouns
                 if len(noun) > 2 and noun not in stop_words
             }
-            return len(significant_nouns) > 0
-        
+            return {
+                "has_unverified": len(significant_nouns) > 0,
+                "unverified_nouns": significant_nouns,
+                "response_nouns": response_proper_nouns,
+                "chunks_nouns": set()
+            }
+
         # Combine all chunk text and convert to lowercase for safe searching
         chunks_text_lower = " ".join([chunk.chunk.text for chunk in sources]).lower()
-        
+
+        # Extract proper nouns from chunks for comparison
+        chunks_text = " ".join([chunk.chunk.text for chunk in sources])
+        chunks_proper_nouns = self._extract_proper_nouns(chunks_text)
+
         # Check if the extracted nouns exist ANYWHERE in the source chunks
         unverified_nouns = set()
         for noun in response_proper_nouns:
             # Use regex boundaries to ensure we match whole words only
             if not re.search(rf'\b{re.escape(noun)}\b', chunks_text_lower):
                 unverified_nouns.add(noun)
-        
+
         # Filter out common words that might be capitalized but aren't features
         stop_words = {
             "the", "this", "that", "these", "those", "it", "they", "we", "you",
             "a", "an", "and", "or", "but", "for", "in", "on", "at", "to", "of", "with",
-            "your", "my", "our", "their", "his", "her", "its","set", "up", "integrations", "youre", "go", "click", "search", "configure"
+            "your", "my", "our", "their", "his", "her", "its"
         }
         
-        significant_unverified = {
-            noun for noun in unverified_nouns
-            if len(noun) > 2 and noun not in stop_words
+        # Additional filtering for malformed extractions
+        significant_unverified = set()
+        for noun in unverified_nouns:
+            # Skip if too short
+            if len(noun) <= 2:
+                continue
+            
+            # Skip if in stop words
+            if noun in stop_words:
+                continue
+            
+            # Skip if contains special characters (except spaces and hyphens)
+            if re.search(r'[^a-z0-9\s\-]', noun):
+                continue
+            
+            # Skip if starts with stop words
+            first_word = noun.split()[0] if ' ' in noun else noun
+            if first_word in stop_words:
+                continue
+            
+            significant_unverified.add(noun)
+
+        return {
+            "has_unverified": len(significant_unverified) > 0,
+            "unverified_nouns": significant_unverified,
+            "response_nouns": response_proper_nouns,
+            "chunks_nouns": chunks_proper_nouns
         }
-        
-        return len(significant_unverified) > 0
     
     def _extract_proper_nouns(self, text: str) -> Set[str]:
         """
@@ -298,7 +349,27 @@ class OutputEvaluator:
             for ent in doc.ents:
                 # Focus on organizations, products, and locations
                 if ent.label_ in ["ORG", "PRODUCT", "GPE"]:
-                    proper_nouns.add(ent.text.lower())
+                    # Clean the entity text
+                    cleaned = ent.text.lower().strip()
+                    
+                    # Filter out malformed extractions with special characters
+                    if re.search(r'[^a-z0-9\s\-]', cleaned):
+                        continue
+                    
+                    # Split multi-word entities into individual words
+                    # This prevents "the Slack integration" from being treated as one entity
+                    words = cleaned.split()
+                    
+                    # Common stop words to filter out
+                    stop_words = {'the', 'a', 'an', 'this', 'that', 'these', 'those'}
+                    
+                    for word in words:
+                        # Skip stop words and short words
+                        if word in stop_words or len(word) <= 2:
+                            continue
+                        
+                        # Add individual word as proper noun
+                        proper_nouns.add(word)
         else:
             # Fallback: Simple capitalized word extraction
             # This is less accurate but works without spaCy
