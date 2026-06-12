@@ -5,11 +5,17 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { marked } from 'marked'
 
+/**
+ * Represents a single message in the chat interface.
+ */
 interface Message {
   role: 'user' | 'assistant'
   content: string
 }
 
+/**
+ * Tracks the number of tokens used for input and output.
+ */
 interface TokenUsage {
   input: number
   output: number

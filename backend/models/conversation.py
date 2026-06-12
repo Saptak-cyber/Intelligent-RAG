@@ -16,3 +16,8 @@ class Conversation:
     conversation_id: str
     turns: List[Turn]
     created_at: datetime
+
+    @property
+    def total_turns(self) -> int:
+        """Returns the total number of turns in this conversation."""
+        return len(self.turns)

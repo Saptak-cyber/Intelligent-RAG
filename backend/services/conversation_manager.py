@@ -44,7 +44,7 @@ class ConversationManager:
             Conversation object with ID and turns
         """
         if conversation_id:
-            # Try to retrieve existing conversation
+            # Try to retrieve existing conversation from the database
             try:
                 result = self.client.table("conversations").select("*").eq("conversation_id", conversation_id).execute()
                 

@@ -15,3 +15,8 @@ class Document:
     filename: str
     pages: List[Page]
     total_pages: int
+
+    @property
+    def total_words(self) -> int:
+        """Calculate the total word count across all pages."""
+        return sum(page.word_count for page in self.pages)
