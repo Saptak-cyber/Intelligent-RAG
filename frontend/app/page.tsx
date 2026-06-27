@@ -437,10 +437,11 @@ export default function Home() {
               />
               <button
                 type="submit"
+                aria-label={isLoading ? 'Sending...' : 'Send message'}
                 disabled={isLoading || !input.trim()}
                 className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 disabled:from-slate-700 disabled:to-slate-700 disabled:cursor-not-allowed transition-all transform hover:scale-105 disabled:transform-none shadow-lg disabled:shadow-none font-medium self-end"
               >
-                {isLoading ? '⏳' : ''} Send
+                {isLoading ? '⏳ ' : ''} Send
               </button>
             </form>
           </div>

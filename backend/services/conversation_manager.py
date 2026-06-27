@@ -131,7 +131,8 @@ class ConversationManager:
             context_parts.append(f"Previous Q: {turn.query}")
             context_parts.append(f"Previous A: {turn.response}")
         
-        context = "\n".join(context_parts)
+        _CONTEXT_SEPARATOR = "\n"
+        context = _CONTEXT_SEPARATOR.join(context_parts)
         logger.debug(f"Retrieved context for conversation {conversation_id}: {len(turns)} turns")
         
         return context
